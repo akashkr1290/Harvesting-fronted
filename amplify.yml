@@ -9,7 +9,7 @@ frontend:
         - flutter pub get
     build:
       commands:
-        - flutter build web
+        - flutter build web --dart-define=API_BASE_URL=https://44-213-187-245.sslip.io
   artifacts:
     baseDirectory: build/web
     files:
