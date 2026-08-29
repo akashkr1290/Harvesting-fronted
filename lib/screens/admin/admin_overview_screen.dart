@@ -1,6 +1,10 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../models/case_status.dart';
+import '../../services/api_client.dart';
 import '../../services/case_service.dart';
 import '../../theme/app_theme.dart';
 
@@ -13,6 +17,48 @@ class AdminOverviewScreen extends StatefulWidget {
 
 class _AdminOverviewScreenState extends State<AdminOverviewScreen> {
   String _locationFilter = 'All';
+  bool _exporting = false;
+
+  Future<void> _refresh(CaseService caseService) async {
+    try {
+      await caseService.fetchAll();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not refresh. Check your connection and try again.')),
+      );
+    }
+  }
+
+  Future<void> _exportExcel() async {
+    setState(() => _exporting = true);
+    try {
+      final path = _locationFilter == 'All'
+          ? '/api/cases/export'
+          : '/api/cases/export?location=${Uri.encodeQueryComponent(_locationFilter)}';
+      final bytes = await context.read<ApiClient>().getBytes(path);
+      if (!mounted) return;
+      final file = XFile.fromData(
+        Uint8List.fromList(bytes),
+        name: 'harvestflow-cases.xlsx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+      await Share.shareXFiles([file], text: 'HarvestFlow Cases');
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Export failed. Check your connection and try again.')),
+      );
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +75,7 @@ class _AdminOverviewScreenState extends State<AdminOverviewScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Admin Overview')),
       body: RefreshIndicator(
-        onRefresh: () => caseService.fetchAll(),
+        onRefresh: () => _refresh(caseService),
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -47,10 +93,10 @@ class _AdminOverviewScreenState extends State<AdminOverviewScreen> {
                 ),
                 IconButton(
                   tooltip: 'Export to Excel',
-                  icon: const Icon(Icons.download_outlined),
-                  onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Excel export runs against the real backend dataset once connected.')),
-                  ),
+                  icon: _exporting
+                      ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.download_outlined),
+                  onPressed: _exporting ? null : _exportExcel,
                 ),
               ],
             ),

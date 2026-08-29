@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/harvest_case.dart';
 import '../models/plot_selection.dart';
+import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../services/case_service.dart';
 import '../theme/app_theme.dart';
@@ -50,6 +52,11 @@ class _PlotSelectionFormScreenState extends State<PlotSelectionFormScreen>
   DateTime? _harvestingDate;
   String _priority = 'medium';
 
+  /// Server fileKey (e.g. "plot-photos/&lt;uuid&gt;.jpg") once uploaded — the
+  /// previous version of this screen had no photo picker at all.
+  String? _photoKey;
+  bool _uploadingPhoto = false;
+
   @override
   void initState() {
     super.initState();
@@ -71,6 +78,7 @@ class _PlotSelectionFormScreenState extends State<PlotSelectionFormScreen>
       _visitDate = existing.visitDate;
       _harvestingDate = existing.harvestingDate;
       _priority = existing.priority;
+      _photoKey = existing.photoPath;
     }
   }
 
@@ -112,6 +120,42 @@ class _PlotSelectionFormScreenState extends State<PlotSelectionFormScreen>
         _harvestingDate = picked;
       }
     });
+  }
+
+  Future<void> _pickPhoto() async {
+    final picker = ImagePicker();
+    final XFile? picked;
+    try {
+      picked = await picker.pickImage(source: ImageSource.camera, maxWidth: 1600);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open the camera on this device.')),
+      );
+      return;
+    }
+    if (picked == null) return;
+
+    setState(() => _uploadingPhoto = true);
+    try {
+      final bytes = await picked.readAsBytes();
+      final res = await context.read<ApiClient>().uploadFile(
+            '/api/uploads/plot-photo',
+            bytes: bytes,
+            filename: picked.name,
+          );
+      setState(() => _photoKey = res['fileKey'] as String?);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Upload failed. Check your connection and try again.')),
+      );
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
+    }
   }
 
   String? _requiredValidator(String? value) {
@@ -187,6 +231,7 @@ class _PlotSelectionFormScreenState extends State<PlotSelectionFormScreen>
       plotCode: _plotCodeController.text.trim(),
       gpsNote: _gpsController.text.trim(),
       priority: _priority,
+      photoPath: _photoKey,
     );
 
     final actor = context.read<AuthService>().username ?? 'Plot Selection Team';
@@ -263,6 +308,16 @@ class _PlotSelectionFormScreenState extends State<PlotSelectionFormScreen>
             TextFormField(
               controller: _gpsController,
               decoration: const InputDecoration(labelText: 'GPS Note / Landmark'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _uploadingPhoto ? null : _pickPhoto,
+              icon: _uploadingPhoto
+                  ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : Icon(_photoKey != null ? Icons.check_circle : Icons.camera_alt_outlined),
+              label: Text(_uploadingPhoto
+                  ? 'Uploading...'
+                  : (_photoKey != null ? 'Photo Attached (tap to replace)' : 'Take Plot Photo')),
             ),
 
             const SizedBox(height: 24),

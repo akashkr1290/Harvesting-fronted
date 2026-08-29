@@ -6,6 +6,8 @@ import '../services/case_service.dart';
 import '../services/master_data_service.dart';
 import '../theme/app_theme.dart';
 import 'dashboard_screen.dart';
+import 'forgot_password_screen.dart';
+import '../models/user_role.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -39,16 +41,25 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _submitting = true);
     try {
       await context.read<AuthService>().login(username, password);
-
-      // Bootstrap the two datasets almost every screen reads synchronously
-      // off local cache — master data (dropdowns) and cases (queues/lists)
-      // — so the dashboard and every stage screen behind it work exactly
-      // as they did against the old in-memory mock data.
       if (!mounted) return;
-      await Future.wait([
-        context.read<MasterDataService>().fetchAll(),
-        context.read<CaseService>().fetchAll(),
-      ]);
+      final role = context.read<AuthService>().role;
+
+      // Marketplace accounts never touch the internal harvest-ops queues,
+      // so skip bootstrapping master data / cases for them entirely —
+      // those screens (and this cache) belong to the other 10 roles only.
+      if (role != null && role.isMarketplaceRole) {
+        // Nothing to eagerly bootstrap — the marketplace dashboard and its
+        // screens each fetch their own data on demand.
+      } else {
+        // Bootstrap the two datasets almost every screen reads synchronously
+        // off local cache — master data (dropdowns) and cases (queues/lists)
+        // — so the dashboard and every stage screen behind it work exactly
+        // as they did against the old in-memory mock data.
+        await Future.wait([
+          context.read<MasterDataService>().fetchAll(),
+          context.read<CaseService>().fetchAll(),
+        ]);
+      }
 
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
@@ -127,6 +138,15 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
                       : const Text('Log In'),
+                ),
+                const SizedBox(height: 4),
+                TextButton(
+                  onPressed: _submitting
+                      ? null
+                      : () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+                          ),
+                  child: const Text('Forgot password?'),
                 ),
                 const SizedBox(height: 8),
                 const Text(

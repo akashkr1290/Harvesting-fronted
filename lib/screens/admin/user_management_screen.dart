@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../models/app_user.dart';
+import '../../models/login_history_entry.dart';
 import '../../models/user_role.dart';
 import '../../services/api_client.dart';
 import '../../services/user_service.dart';
@@ -202,6 +204,68 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     }
   }
 
+  Future<void> _showLoginHistory(AppUser user) async {
+    List<LoginHistoryEntry> history;
+    try {
+      history = await context.read<UserService>().getLoginHistory(user);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      return;
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not reach the server. Check your connection and try again.')),
+      );
+      return;
+    }
+    if (!mounted) return;
+
+    final dateFmt = DateFormat('dd MMM yyyy, hh:mm a');
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Login History — ${user.username}',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 12),
+              if (history.isEmpty)
+                const Text('No login attempts recorded yet.', style: TextStyle(color: Colors.grey))
+              else
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: history.length,
+                    itemBuilder: (context, i) {
+                      final entry = history[i];
+                      return ListTile(
+                        dense: true,
+                        leading: Icon(
+                          entry.success ? Icons.check_circle_outline : Icons.error_outline,
+                          color: entry.success ? AppTheme.primary : AppTheme.danger,
+                        ),
+                        title: Text(dateFmt.format(entry.loggedInAt.toLocal())),
+                        subtitle: Text(entry.success
+                            ? (entry.ipAddress ?? 'Unknown IP')
+                            : (entry.failureReason ?? 'Failed') + (entry.ipAddress != null ? ' · ${entry.ipAddress}' : '')),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final userService = context.watch<UserService>();
@@ -217,7 +281,19 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
       body: userService.isLoading && users.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-              onRefresh: () => context.read<UserService>().fetchUsers(),
+              onRefresh: () async {
+                try {
+                  await context.read<UserService>().fetchUsers();
+                } on ApiException catch (e) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+                } catch (_) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Could not refresh. Check your connection and try again.')),
+                  );
+                }
+              },
               child: ListView.builder(
                 padding: const EdgeInsets.all(16),
                 itemCount: users.length,
@@ -238,11 +314,14 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                             _toggleActive(user);
                           } else if (action == 'reset') {
                             _resetPassword(user);
+                          } else if (action == 'history') {
+                            _showLoginHistory(user);
                           }
                         },
                         itemBuilder: (context) => [
                           PopupMenuItem(value: 'toggle', child: Text(user.active ? 'Deactivate' : 'Activate')),
                           const PopupMenuItem(value: 'reset', child: Text('Reset Password')),
+                          const PopupMenuItem(value: 'history', child: Text('View Login History')),
                         ],
                       ),
                     ),

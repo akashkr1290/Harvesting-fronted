@@ -1,6 +1,9 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/case_status.dart';
 import '../models/reports_summary.dart';
 import '../services/api_client.dart';
@@ -21,6 +24,7 @@ class ReportsScreen extends StatefulWidget {
 
 class _ReportsScreenState extends State<ReportsScreen> {
   String? _error;
+  bool _exporting = false;
 
   @override
   void initState() {
@@ -41,6 +45,30 @@ class _ReportsScreenState extends State<ReportsScreen> {
     }
   }
 
+  Future<void> _exportExcel() async {
+    setState(() => _exporting = true);
+    try {
+      final bytes = await context.read<ApiClient>().getBytes('/api/reports/summary/export');
+      if (!mounted) return;
+      final file = XFile.fromData(
+        Uint8List.fromList(bytes),
+        name: 'harvestflow-reports.xlsx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+      await Share.shareXFiles([file], text: 'HarvestFlow Reports');
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Export failed. Check your connection and try again.')),
+      );
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final reportsService = context.watch<ReportsService>();
@@ -58,10 +86,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ),
           IconButton(
             tooltip: 'Export to Excel',
-            icon: const Icon(Icons.download_outlined),
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Excel export is a planned backend feature — not wired up yet.')),
-            ),
+            icon: _exporting
+                ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.download_outlined),
+            onPressed: _exporting ? null : _exportExcel,
           ),
         ],
       ),

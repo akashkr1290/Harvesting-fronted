@@ -10,6 +10,32 @@ enum UserRole {
   transportPerson,
   laborCoordinator,
   eicherDriver,
+
+  // ---- Phase 2: Marketplace roles — separate from the internal
+  // harvest-operations roles above. A marketplace participant never sees
+  // the plot-selection-through-sales-invoice pipeline. ----
+  farmer,
+  fpo,
+  consumer,
+  bulkBuyer,
+}
+
+/// True for the four Phase 2 marketplace roles — used by DashboardScreen
+/// to route to the marketplace experience instead of the internal
+/// harvest-operations one, and by screens that only make sense for one
+/// side of the marketplace (e.g. "create listing" is seller-only).
+extension MarketplaceRoleX on UserRole {
+  bool get isMarketplaceRole =>
+      this == UserRole.farmer ||
+      this == UserRole.fpo ||
+      this == UserRole.consumer ||
+      this == UserRole.bulkBuyer;
+
+  /// FARMER and FPO can create/manage listings and receive offers.
+  bool get isMarketplaceSeller => this == UserRole.farmer || this == UserRole.fpo;
+
+  /// CONSUMER and BULK_BUYER browse the marketplace and submit offers.
+  bool get isMarketplaceBuyer => this == UserRole.consumer || this == UserRole.bulkBuyer;
 }
 
 extension UserRoleX on UserRole {
@@ -37,6 +63,14 @@ extension UserRoleX on UserRole {
         return 'LABOR_COORDINATOR';
       case UserRole.eicherDriver:
         return 'EICHER_DRIVER';
+      case UserRole.farmer:
+        return 'FARMER';
+      case UserRole.fpo:
+        return 'FPO';
+      case UserRole.consumer:
+        return 'CONSUMER';
+      case UserRole.bulkBuyer:
+        return 'BULK_BUYER';
     }
   }
 
@@ -62,6 +96,14 @@ extension UserRoleX on UserRole {
         return 'Labor Coordinator';
       case UserRole.eicherDriver:
         return 'Eicher Truck Driver';
+      case UserRole.farmer:
+        return 'Farmer';
+      case UserRole.fpo:
+        return 'FPO';
+      case UserRole.consumer:
+        return 'Consumer';
+      case UserRole.bulkBuyer:
+        return 'Bulk Buyer';
     }
   }
 
@@ -88,6 +130,14 @@ extension UserRoleX on UserRole {
         return 'Adds labor/local labor contractor and cost';
       case UserRole.eicherDriver:
         return 'Confirms loading, transit, and delivery milestones';
+      case UserRole.farmer:
+        return 'Lists produce on the marketplace and manages offers';
+      case UserRole.fpo:
+        return 'Lists aggregated produce on behalf of member farmers';
+      case UserRole.consumer:
+        return 'Browses the marketplace and buys produce directly';
+      case UserRole.bulkBuyer:
+        return 'Browses the marketplace and places bulk offers';
     }
   }
 }

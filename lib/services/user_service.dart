@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'api_client.dart';
 import '../models/app_user.dart';
+import '../models/login_history_entry.dart';
 import '../models/user_role.dart';
 
 /// Returned once by createUser/resetPassword — the only two moments the
@@ -73,5 +74,10 @@ class UserService extends ChangeNotifier {
     if (index != -1) _users[index] = updated;
     notifyListeners();
     return CredentialResult(user: updated, temporaryPassword: res['temporaryPassword'] as String);
+  }
+
+  Future<List<LoginHistoryEntry>> getLoginHistory(AppUser user) async {
+    final res = await _api.get('/api/users/${user.id}/login-history') as List<dynamic>;
+    return res.map((j) => LoginHistoryEntry.fromJson(j as Map<String, dynamic>)).toList();
   }
 }

@@ -55,6 +55,20 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Always succeeds from the caller's point of view whether or not the
+  /// username exists — the backend deliberately never reveals that, so
+  /// there's nothing for this method to branch on either.
+  Future<void> requestPasswordReset(String username) async {
+    await _api.post('/api/auth/forgot-password', body: {'username': username});
+  }
+
+  Future<void> resetPasswordWithToken(String token, String newPassword) async {
+    await _api.post('/api/auth/reset-password', body: {
+      'token': token,
+      'newPassword': newPassword,
+    });
+  }
+
   void logout() {
     _api.setToken(null);
     _userId = null;

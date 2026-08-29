@@ -38,6 +38,12 @@ class ApiClient {
   final String baseUrl;
   String? _token;
 
+  /// Fired whenever any request comes back 401 — i.e. the token is
+  /// missing, expired, or otherwise rejected. AuthService listens to this
+  /// (set in main.dart) to force a logout + redirect to the login screen,
+  /// rather than every screen having to notice a 401 individually.
+  void Function()? onUnauthorized;
+
   ApiClient({String? baseUrl}) : baseUrl = baseUrl ?? ApiConfig.baseUrl;
 
   void setToken(String? token) => _token = token;
@@ -110,7 +116,33 @@ class ApiClient {
     return _handle(res);
   }
 
+  /// Multipart upload — used for plot photos and weight slips. Returns the
+  /// decoded JSON body (an UploadResponse shape: fileKey/url/contentType/sizeBytes).
+  Future<dynamic> uploadFile(String path, {required List<int> bytes, required String filename}) async {
+    final request = http.MultipartRequest('POST', _uri(path));
+    if (_token != null) request.headers['Authorization'] = 'Bearer $_token';
+    request.files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+
+    final streamedRes = await request.send().timeout(_timeout);
+    final res = await http.Response.fromStream(streamedRes);
+    return _handle(res);
+  }
+
   static const _timeout = Duration(seconds: 15);
+
+  /// Full URL for a stored file path (e.g. an UploadResponse's "url":
+  /// "/api/files/produce-photos/<uuid>.jpg") plus the header needed to
+  /// fetch it — file serving requires the same JWT every other endpoint
+  /// does, so Image.network needs this to display a listing photo.
+  Uri fileUri(String path) => Uri.parse('$baseUrl$path');
+  Map<String, String> get authHeaders => {if (_token != null) 'Authorization': 'Bearer $_token'};
+
+  /// Phase 4/5: same idea as [fileUri] above but returning a String, used by
+  /// the produce-image (AI verification) screens — Phase 2's [fileUri] and
+  /// Phase 4's [resolveUrl] were two independent solutions to the same
+  /// "turn a relative /api/files/... path into something Image.network can
+  /// load" problem; both are kept since callers on each side already exist.
+  String resolveUrl(String path) => '$baseUrl$path';
 
   dynamic _handle(http.Response res) {
     if (res.statusCode >= 200 && res.statusCode < 300) {
@@ -121,6 +153,11 @@ class ApiClient {
   }
 
   ApiException _parseError(http.Response res) {
+    if (res.statusCode == 401) {
+      // Fire on a microtask so this doesn't run in the middle of whatever
+      // widget build/callback triggered the request.
+      Future.microtask(() => onUnauthorized?.call());
+    }
     try {
       final parsed = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
       return ApiException(
@@ -133,7 +170,9 @@ class ApiClient {
       return ApiException(
         statusCode: res.statusCode,
         error: 'Error',
-        message: 'Request failed (${res.statusCode})',
+        message: res.statusCode == 401
+            ? 'Your session has expired. Please log in again.'
+            : 'Request failed (${res.statusCode})',
       );
     }
   }

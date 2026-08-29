@@ -152,3 +152,14 @@ String? numericValidator(String? value) {
   if (double.tryParse(value.trim()) == null) return 'Must be a number';
   return null;
 }
+
+/// Used by the marketplace forms (listing quantity/price, offer
+/// quantity/price) — every one of those fields must be a positive number,
+/// not just any number.
+String? positiveNumericValidator(String? value) {
+  if (value == null || value.trim().isEmpty) return 'Required';
+  final parsed = double.tryParse(value.trim());
+  if (parsed == null) return 'Must be a number';
+  if (parsed <= 0) return 'Must be greater than 0';
+  return null;
+}

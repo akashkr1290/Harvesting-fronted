@@ -60,7 +60,17 @@ class _PlotSelectionListScreenState extends State<PlotSelectionListScreen> {
   }
 
   Future<void> _refresh() async {
-    await context.read<CaseService>().fetchAll();
+    try {
+      await context.read<CaseService>().fetchAll();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not refresh. Check your connection and try again.')),
+      );
+    }
   }
 
   void _showTimeline(HarvestCase harvestCase) {

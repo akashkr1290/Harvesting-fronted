@@ -148,7 +148,19 @@ class _MasterDataScreenState extends State<MasterDataScreen> with SingleTickerPr
               child: const Icon(Icons.add),
             ),
             body: RefreshIndicator(
-              onRefresh: () => context.read<MasterDataService>().fetchAll(),
+              onRefresh: () async {
+                try {
+                  await context.read<MasterDataService>().fetchAll();
+                } on ApiException catch (e) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+                } catch (_) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Could not refresh. Check your connection and try again.')),
+                  );
+                }
+              },
               child: items.isEmpty
                   ? ListView(
                       children: const [

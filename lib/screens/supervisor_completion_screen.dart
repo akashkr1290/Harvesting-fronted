@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../models/harvest_case.dart';
 import '../models/harvest_completion.dart';
+import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../services/case_service.dart';
 import '../widgets/case_card.dart';
@@ -29,7 +30,13 @@ class _SupervisorCompletionScreenState extends State<SupervisorCompletionScreen>
   final _remarksController = TextEditingController();
 
   DateTime? _actualDate;
-  String? _weightSlipFileName;
+
+  /// The backend's fileKey (e.g. "weight-slips/&lt;uuid&gt;.jpg") once a real
+  /// upload succeeds — this is what actually gets saved on the case, not
+  /// a local device filename that would mean nothing off this device.
+  String? _weightSlipFileKey;
+  String? _weightSlipDisplayName;
+  bool _uploadingWeightSlip = false;
 
   @override
   void initState() {
@@ -53,15 +60,41 @@ class _SupervisorCompletionScreenState extends State<SupervisorCompletionScreen>
   }
 
   Future<void> _pickWeightSlip() async {
+    final picker = ImagePicker();
+    final XFile? picked;
     try {
-      final picker = ImagePicker();
-      final file = await picker.pickImage(source: ImageSource.gallery);
-      if (file != null) setState(() => _weightSlipFileName = file.name);
+      picked = await picker.pickImage(source: ImageSource.gallery);
     } catch (_) {
-      // Platform may not support image_picker in this environment (e.g. web
-      // without config); fall back to a mock filename so the flow still
-      // demos end to end.
-      setState(() => _weightSlipFileName = 'weight_slip_${DateTime.now().millisecondsSinceEpoch}.jpg');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open the photo picker on this device.')),
+      );
+      return;
+    }
+    if (picked == null) return;
+
+    setState(() => _uploadingWeightSlip = true);
+    try {
+      final bytes = await picked.readAsBytes();
+      final res = await context.read<ApiClient>().uploadFile(
+            '/api/uploads/weight-slip',
+            bytes: bytes,
+            filename: picked.name,
+          );
+      setState(() {
+        _weightSlipFileKey = res['fileKey'] as String?;
+        _weightSlipDisplayName = picked!.name;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Upload failed. Check your connection and try again.')),
+      );
+    } finally {
+      if (mounted) setState(() => _uploadingWeightSlip = false);
     }
   }
 
@@ -78,7 +111,7 @@ class _SupervisorCompletionScreenState extends State<SupervisorCompletionScreen>
       finalRecovery: double.tryParse(_recoveryController.text.trim()) ?? 0,
       finalPulp: double.tryParse(_pulpController.text.trim()) ?? 0,
       remarks: _remarksController.text.trim(),
-      weightSlipFileName: _weightSlipFileName,
+      weightSlipFileName: _weightSlipFileKey,
     );
 
     final actor = context.read<AuthService>().username ?? 'Supervisor';
@@ -162,9 +195,13 @@ class _SupervisorCompletionScreenState extends State<SupervisorCompletionScreen>
             const SizedBox(height: 20),
             const SectionHeader('Weight Slip'),
             OutlinedButton.icon(
-              onPressed: _pickWeightSlip,
-              icon: const Icon(Icons.upload_file_outlined),
-              label: Text(_weightSlipFileName ?? 'Upload Weight Slip Photo / PDF'),
+              onPressed: _uploadingWeightSlip ? null : _pickWeightSlip,
+              icon: _uploadingWeightSlip
+                  ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : Icon(_weightSlipFileKey != null ? Icons.check_circle : Icons.upload_file_outlined),
+              label: Text(_uploadingWeightSlip
+                  ? 'Uploading...'
+                  : (_weightSlipDisplayName ?? 'Upload Weight Slip Photo')),
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(

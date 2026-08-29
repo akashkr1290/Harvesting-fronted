@@ -5,6 +5,7 @@ import '../models/harvest_case.dart';
 import '../models/user_role.dart';
 import '../services/auth_service.dart';
 import '../services/case_service.dart';
+import '../services/api_client.dart';
 import '../theme/app_theme.dart';
 import '../widgets/case_card.dart';
 import 'plot_selection_form_screen.dart';
@@ -23,11 +24,38 @@ import 'reports_screen.dart';
 import 'admin/admin_overview_screen.dart';
 import 'admin/user_management_screen.dart';
 import 'admin/master_data_screen.dart';
+import 'admin/admin_verification_queue_screen.dart';
+import 'admin/sih_impact_screen.dart';
+import 'admin/payment_screen.dart';
+import 'notifications_screen.dart';
+import 'demand_forecast_screen.dart';
+import 'route_optimization_screen.dart';
 import 'login_screen.dart';
+import 'marketplace/marketplace_dashboard_screen.dart';
 import '../models/logistics_entry.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
+
+  /// Pull-to-refresh previously called fetchAll() directly with no error
+  /// handling — a failed refresh (network drop, expired-but-not-yet-401'd
+  /// token, etc.) would propagate as an uncaught exception instead of
+  /// giving the user any feedback that the refresh didn't work.
+  Future<void> _refresh(BuildContext context, CaseService caseService) async {
+    try {
+      await caseService.fetchAll();
+    } on ApiException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not refresh. Check your connection and try again.')),
+        );
+      }
+    }
+  }
 
   /// Routes a tapped pending case to the correct stage screen. Some roles
   /// own two different stages (Purchase Account: rate update vs invoice;
@@ -66,9 +94,13 @@ class DashboardScreen extends StatelessWidget {
         break;
       case UserRole.plotSelection:
       case UserRole.eicherDriver:
+      case UserRole.farmer:
+      case UserRole.fpo:
+      case UserRole.consumer:
+      case UserRole.bulkBuyer:
         screen = null;
         break;
-    }
+          }
 
     if (screen != null) {
       Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen!));
@@ -85,12 +117,23 @@ class DashboardScreen extends StatelessWidget {
       return const EicherTripScreen();
     }
 
+    if (role.isMarketplaceRole) {
+      return const MarketplaceDashboardScreen();
+    }
+
     final pending = caseService.pendingFor(role);
 
     return Scaffold(
       appBar: AppBar(
         title: Text(role.label),
         actions: [
+          IconButton(
+            tooltip: 'Notifications',
+            icon: const Icon(Icons.notifications_outlined),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+            ),
+          ),
           if (role == UserRole.admin)
             PopupMenuButton<String>(
               icon: const Icon(Icons.admin_panel_settings_outlined),
@@ -107,6 +150,15 @@ class DashboardScreen extends StatelessWidget {
                   case 'masters':
                     target = const MasterDataScreen();
                     break;
+                  case 'verification-queue':
+                    target = const AdminVerificationQueueScreen();
+                    break;
+                  case 'sih-impact':
+                    target = const SihImpactScreen();
+                    break;
+                  case 'payment':
+                    target = const PaymentScreen();
+                    break;
                   default:
                     target = const ReportsScreen();
                 }
@@ -117,7 +169,25 @@ class DashboardScreen extends StatelessWidget {
                 PopupMenuItem(value: 'users', child: Text('User Management')),
                 PopupMenuItem(value: 'masters', child: Text('Master Data')),
                 PopupMenuItem(value: 'reports', child: Text('Reports')),
+                PopupMenuDivider(),
+                PopupMenuItem(value: 'verification-queue', child: Text('Verification Queue')),
+                PopupMenuItem(value: 'sih-impact', child: Text('Analytics & SIH Impact')),
+                PopupMenuItem(value: 'payment', child: Text('Record Payment (mock)')),
               ],
+            ),
+          if (role == UserRole.planning)
+            IconButton(
+              tooltip: 'Demand Forecast (AI)',
+              icon: const Icon(Icons.auto_graph),
+              onPressed: () => Navigator.of(context)
+                  .push(MaterialPageRoute(builder: (_) => const DemandForecastScreen())),
+            ),
+          if (role == UserRole.pickupPerson || role == UserRole.transportPerson)
+            IconButton(
+              tooltip: 'Route Optimization',
+              icon: const Icon(Icons.route_outlined),
+              onPressed: () => Navigator.of(context)
+                  .push(MaterialPageRoute(builder: (_) => const RouteOptimizationScreen())),
             ),
           IconButton(
             tooltip: 'Log out',
@@ -144,7 +214,7 @@ class DashboardScreen extends StatelessWidget {
             )
           : null,
       body: RefreshIndicator(
-        onRefresh: () => caseService.fetchAll(),
+        onRefresh: () => _refresh(context, caseService),
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
