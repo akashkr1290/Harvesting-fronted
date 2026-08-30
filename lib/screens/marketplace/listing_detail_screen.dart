@@ -166,7 +166,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
               (i) => i.isPrimary,
               orElse: () => _verifiedImages.first,
             ))
-          else if (listing.imageUrls.isNotEmpty)
+          else if (widget.isOwner && listing.imageUrls.isNotEmpty)
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: ProducePhoto(url: listing.primaryImageUrl!, height: 200, width: double.infinity),
@@ -193,6 +193,11 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
             label: 'Expected Price',
             value: '₹${listing.expectedPricePerUnit.toStringAsFixed(2)} / ${listing.unit}',
             emphasize: true,
+          ),
+          LabeledValue(
+            label: 'Photo Verification',
+            value: listing.verificationStatus,
+            emphasize: listing.verificationStatus == 'AUTHENTICITY_LIKELY',
           ),
           if (listing.description?.isNotEmpty == true) ...[
             const SizedBox(height: 12),

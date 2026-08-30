@@ -1,4 +1,5 @@
 import 'order_status.dart';
+import 'case_status.dart';
 import '../utils/api_dates.dart';
 
 /// Matches OrderResponse — created the moment a farmer/FPO accepts an
@@ -19,6 +20,10 @@ class MarketOrder {
   final double totalAmount;
   final MarketOrderStatus status;
   final DateTime createdAt;
+  final DateTime? expectedHarvestDate;
+  final String? harvestCaseId;
+  final CaseStatus? operationalStatus;
+  final DateTime? deliveredAt;
 
   MarketOrder({
     required this.id,
@@ -34,6 +39,10 @@ class MarketOrder {
     required this.totalAmount,
     required this.status,
     required this.createdAt,
+    this.expectedHarvestDate,
+    this.harvestCaseId,
+    this.operationalStatus,
+    this.deliveredAt,
   });
 
   factory MarketOrder.fromJson(Map<String, dynamic> json) {
@@ -51,6 +60,14 @@ class MarketOrder {
       totalAmount: (json['totalAmount'] as num).toDouble(),
       status: marketOrderStatusFromApi(json['status'] as String),
       createdAt: parseApiInstant(json['createdAt'] as String),
+      expectedHarvestDate: json['expectedHarvestDate'] == null
+          ? null
+          : parseApiDate(json['expectedHarvestDate'] as String),
+      harvestCaseId: json['harvestCaseId'] as String?,
+      operationalStatus: json['operationalStatus'] == null
+          ? null
+          : caseStatusFromApi(json['operationalStatus'] as String),
+      deliveredAt: json['deliveredAt'] == null ? null : parseApiInstant(json['deliveredAt'] as String),
     );
   }
 }

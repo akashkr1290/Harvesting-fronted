@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../models/listing_status.dart';
 import '../../models/produce_listing.dart';
-import '../../services/api_client.dart';
 import '../../services/marketplace_service.dart';
+import '../produce_image_screen.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/form_helpers.dart';
-import '../../widgets/marketplace/produce_photo.dart';
+import 'package:provider/provider.dart';
 
 /// Doubles as both "Create Listing" and "Edit Listing" — pass
 /// [existingListing] to edit. The backend only allows edits while the
@@ -36,8 +35,6 @@ class _CreateEditListingScreenState extends State<CreateEditListingScreen> with 
   final _descriptionController = TextEditingController();
 
   DateTime? _harvestDate;
-  List<String> _imageUrls = [];
-  bool _uploadingPhoto = false;
 
   @override
   void initState() {
@@ -52,7 +49,6 @@ class _CreateEditListingScreenState extends State<CreateEditListingScreen> with 
       _priceController.text = existing.expectedPricePerUnit.toString();
       _descriptionController.text = existing.description ?? '';
       _harvestDate = existing.harvestDate;
-      _imageUrls = List.of(existing.imageUrls);
     }
   }
 
@@ -84,53 +80,7 @@ class _CreateEditListingScreenState extends State<CreateEditListingScreen> with 
     setState(() => _harvestDate = picked);
   }
 
-  /// Uploads a photo via the existing storage flow, then — if this listing
-  /// already exists — immediately attaches it server-side too, so a photo
-  /// added to an existing draft doesn't get lost if the user backs out
-  /// without pressing Save.
-  Future<void> _pickPhoto() async {
-    final picker = ImagePicker();
-    final XFile? picked;
-    try {
-      picked = await picker.pickImage(source: ImageSource.camera, maxWidth: 1600);
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open the camera on this device.')),
-      );
-      return;
-    }
-    if (picked == null) return;
-
-    setState(() => _uploadingPhoto = true);
-    try {
-      final bytes = await picked.readAsBytes();
-      final res = await context.read<ApiClient>().uploadFile(
-            '/api/uploads/produce-photo',
-            bytes: bytes,
-            filename: picked.name,
-          );
-      final url = res['url'] as String?;
-      if (url == null) throw Exception('Upload succeeded but returned no url.');
-
-      if (widget.isEditing) {
-        await context.read<MarketplaceService>().addImages(widget.existingListing!.id, [url]);
-      }
-      setState(() => _imageUrls = [..._imageUrls, url]);
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Upload failed. Check your connection and try again.')),
-      );
-    } finally {
-      if (mounted) setState(() => _uploadingPhoto = false);
-    }
-  }
-
-  void _submit() {
+  Future<void> _submit() async {
     if (_harvestDate == null) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Please select a harvest date.')));
@@ -148,7 +98,7 @@ class _CreateEditListingScreenState extends State<CreateEditListingScreen> with 
     final description = _descriptionController.text.trim();
 
     if (widget.isEditing) {
-      submitActionWithResult<ProduceListingDetail>(
+      await submitActionWithResult<ProduceListingDetail>(
         () => service.updateListing(
           widget.existingListing!.id,
           cropName: cropName,
@@ -162,33 +112,36 @@ class _CreateEditListingScreenState extends State<CreateEditListingScreen> with 
         ),
         successMessage: (_) => 'Listing updated.',
         popOnSuccess: false,
-      ).then((_) {
-        if (mounted) Navigator.of(context).pop(true);
-      });
-    } else {
-      submitActionWithResult<ProduceListingDetail>(
-        () async {
-          final created = await service.createListing(
-            cropName: cropName,
-            quantity: quantity,
-            unit: unit,
-            quality: quality.isEmpty ? null : quality,
-            harvestDate: _harvestDate!,
-            location: location,
-            expectedPricePerUnit: price,
-            description: description.isEmpty ? null : description,
-          );
-          if (_imageUrls.isNotEmpty) {
-            await service.addImages(created.id, _imageUrls);
-          }
-          return created;
-        },
-        successMessage: (_) => 'Listing created as a draft. Publish it when you\'re ready.',
-        popOnSuccess: false,
-      ).then((_) {
-        if (mounted) Navigator.of(context).pop(true);
-      });
+      );
+      if (mounted) Navigator.of(context).pop(true);
+      return;
     }
+
+    ProduceListingDetail? createdListing;
+    await submitActionWithResult<ProduceListingDetail>(
+      () async {
+        createdListing = await service.createListing(
+          cropName: cropName,
+          quantity: quantity,
+          unit: unit,
+          quality: quality.isEmpty ? null : quality,
+          harvestDate: _harvestDate!,
+          location: location,
+          expectedPricePerUnit: price,
+          description: description.isEmpty ? null : description,
+        );
+        return createdListing!;
+      },
+      successMessage: (_) => 'Draft created. Add a verified crop photo before publishing.',
+      popOnSuccess: false,
+    );
+
+    if (!mounted || createdListing == null) return;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ProduceImageScreen(listingId: createdListing!.id)),
+    );
+    if (mounted) Navigator.of(context).pop(true);
   }
 
   @override
@@ -282,25 +235,24 @@ class _CreateEditListingScreenState extends State<CreateEditListingScreen> with 
             ),
 
             const SizedBox(height: 24),
-            const SectionHeader('Photos'),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final url in _imageUrls)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: ProducePhoto(url: url, width: 72, height: 72),
-                  ),
-                OutlinedButton.icon(
-                  onPressed: _uploadingPhoto ? null : _pickPhoto,
-                  icon: _uploadingPhoto
-                      ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Icons.camera_alt_outlined),
-                  label: Text(_uploadingPhoto ? 'Uploading...' : 'Add Photo'),
-                ),
-              ],
-            ),
+            const SectionHeader('Crop Photo & Verification'),
+            if (widget.isEditing)
+              OutlinedButton.icon(
+                onPressed: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ProduceImageScreen(listingId: widget.existingListing!.id),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.verified_outlined),
+                label: const Text('Manage Crop Photos & Verification'),
+              )
+            else
+              const Text(
+                'First create the listing as a draft. The next screen will let you upload the actual crop photo and run verification before publishing.',
+                style: TextStyle(color: Colors.black54, fontSize: 12),
+              ),
 
             const SizedBox(height: 28),
             ElevatedButton.icon(

@@ -258,6 +258,28 @@ class _PlotSelectionFormScreenState extends State<PlotSelectionFormScreen>
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            if (widget.existingCase?.marketOrderId != null) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.storefront_outlined, size: 18, color: AppTheme.primaryDark),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'This case came from an accepted marketplace order. Plot/operations data is now being completed by the internal team.',
+                        style: TextStyle(fontSize: 12, color: AppTheme.primaryDark),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
             if (widget.isEditing) ...[
               Container(
                 padding: const EdgeInsets.all(12),

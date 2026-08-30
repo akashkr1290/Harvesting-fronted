@@ -33,6 +33,7 @@ class HarvestCase {
   final PlotSelection selection;
   CaseStatus status;
   final List<TimelineEntry> timeline;
+  final String? marketOrderId;
 
   // Populated progressively as the case moves through stages — each is
   // null until that stage's screen saves it, which is also how "has this
@@ -55,6 +56,7 @@ class HarvestCase {
     required this.selection,
     this.status = CaseStatus.submittedForPlanning,
     List<TimelineEntry>? timeline,
+    this.marketOrderId,
   }) : timeline = timeline ?? [];
 
   /// Builds a full HarvestCase from a CaseDetailResponse — the single
@@ -67,6 +69,7 @@ class HarvestCase {
       id: json['id'] as String,
       selection: PlotSelection.fromCaseJson(json),
       status: caseStatusFromApi(json['status'] as String),
+      marketOrderId: json['marketOrderId'] as String?,
       timeline: (json['timeline'] as List<dynamic>? ?? [])
           .map((t) => TimelineEntry.fromJson(t as Map<String, dynamic>))
           .toList(),

@@ -63,6 +63,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
+  String _caseStatusLabel(dynamic status) {
+    final words = status.name.split('_');
+    return words.map((w) => w.isEmpty ? w : '${w[0]}${w.substring(1).toLowerCase()}').join(' ');
+  }
+
   Widget _buildBody() {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
@@ -106,19 +111,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         LabeledValue(label: 'Agreed Price / Unit', value: '₹${order.agreedPricePerUnit.toStringAsFixed(2)}'),
         LabeledValue(label: 'Total Amount', value: '₹${order.totalAmount.toStringAsFixed(2)}', emphasize: true),
         LabeledValue(label: 'Created', value: dateFmt.format(order.createdAt)),
-        if (order.status == MarketOrderStatus.confirmed) ...[
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: _completingDelivery ? null : _completeDelivery,
-            icon: _completingDelivery
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.local_shipping_outlined),
-            label: const Text('Confirm Delivery & Release Payment'),
+        if (order.expectedHarvestDate != null)
+          LabeledValue(
+            label: 'Expected Harvest Date',
+            value: DateFormat('dd MMM yyyy').format(order.expectedHarvestDate!),
           ),
+        if (order.deliveredAt != null)
+          LabeledValue(label: 'Delivered', value: dateFmt.format(order.deliveredAt!)),
+        if (order.operationalStatus != null) ...[
+          const SizedBox(height: 16),
+          const SectionHeader('Internal Operations Status'),
+          LabeledValue(label: 'Current Stage', value: _caseStatusLabel(order.operationalStatus)),
           const Padding(
             padding: EdgeInsets.only(top: 6),
             child: Text(
-              'Payment is simulated — no real gateway is connected in this deployment.',
+              'The internal HarvestFlow team is handling plot, harvesting, packing, '
+              'logistics and delivery. Payment is released automatically (simulated) '
+              'once the internal workflow completes.',
               style: TextStyle(color: Colors.black54, fontSize: 12),
             ),
           ),
@@ -127,22 +136,4 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  bool _completingDelivery = false;
-
-  Future<void> _completeDelivery() async {
-    setState(() => _completingDelivery = true);
-    try {
-      final updated = await context.read<OrderService>().completeDelivery(widget.orderId);
-      if (!mounted) return;
-      setState(() => _order = updated);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Delivery confirmed. Simulated payment released.')),
-      );
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-    } finally {
-      if (mounted) setState(() => _completingDelivery = false);
-    }
-  }
 }

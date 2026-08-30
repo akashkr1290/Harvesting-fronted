@@ -6,6 +6,7 @@ import '../services/auth_service.dart';
 import '../services/case_service.dart';
 import '../widgets/case_card.dart';
 import '../widgets/form_helpers.dart';
+import 'route_optimization_screen.dart';
 
 /// Handles both Pickup (Step 6) and Transport (Step 8) — same shape:
 /// a name, an amount, an optional advance payment, optional remarks.
@@ -58,6 +59,18 @@ class _LogisticsEntryScreenState extends State<LogisticsEntryScreen>
           padding: const EdgeInsets.all(16),
           children: [
             CaseCard(harvestCase: widget.harvestCase),
+            if (widget.harvestCase.marketOrderId != null) ...[
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => RouteOptimizationScreen(caseId: widget.harvestCase.id),
+                  ),
+                ),
+                icon: const Icon(Icons.route_outlined),
+                label: const Text('Optimize Marketplace Delivery Route'),
+              ),
+            ],
             const SizedBox(height: 16),
             SectionHeader(widget.kind.label),
             TextFormField(

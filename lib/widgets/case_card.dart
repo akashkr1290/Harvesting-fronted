@@ -60,8 +60,12 @@ class CaseCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 4),
-              Text('Case #${harvestCase.id}  ·  ${s.selectedCompany}',
-                  style: const TextStyle(color: Colors.grey, fontSize: 12)),
+              Text(
+                harvestCase.marketOrderId == null
+                    ? 'Case #${harvestCase.id}  ·  ${s.selectedCompany}'
+                    : 'Marketplace Order #${harvestCase.marketOrderId}  ·  Internal Case #${harvestCase.id}',
+                style: const TextStyle(color: Colors.grey, fontSize: 12),
+              ),
             ],
           ),
         ),
