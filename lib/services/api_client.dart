@@ -1,7 +1,25 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'api_config.dart';
+
+/// Maps a filename's extension to the MIME type the backend expects.
+/// Dart's MultipartFile.fromBytes does NOT infer this from the filename —
+/// without an explicit contentType it defaults to application/octet-stream,
+/// which the backend rejects regardless of what the file actually is.
+MediaType _mediaTypeFor(String filename) {
+  final lower = filename.toLowerCase();
+  if (lower.endsWith('.png')) return MediaType('image', 'png');
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
+    return MediaType('image', 'jpeg');
+  }
+  if (lower.endsWith('.webp')) return MediaType('image', 'webp');
+  if (lower.endsWith('.heic')) return MediaType('image', 'heic');
+  // Fall back to jpeg rather than octet-stream, since this client only
+  // ever uploads photos and octet-stream is guaranteed to be rejected.
+  return MediaType('image', 'jpeg');
+}
 
 /// Mirrors the backend's ApiError record (timestamp, status, error, message,
 /// details) so every service can show the same message the API returned —
@@ -121,7 +139,12 @@ class ApiClient {
   Future<dynamic> uploadFile(String path, {required List<int> bytes, required String filename}) async {
     final request = http.MultipartRequest('POST', _uri(path));
     if (_token != null) request.headers['Authorization'] = 'Bearer $_token';
-    request.files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+    request.files.add(http.MultipartFile.fromBytes(
+      'file',
+      bytes,
+      filename: filename,
+      contentType: _mediaTypeFor(filename),
+    ));
 
     final streamedRes = await request.send().timeout(_timeout);
     final res = await http.Response.fromStream(streamedRes);
