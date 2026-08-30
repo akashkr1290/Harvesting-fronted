@@ -8,6 +8,8 @@ class StatusBadge extends StatelessWidget {
 
   Color get _color {
     switch (status) {
+      case CaseStatus.awaitingPlotSelection:
+        return AppTheme.accent;
       case CaseStatus.submittedForPlanning:
       case CaseStatus.planned:
         return Colors.blueGrey;

@@ -93,6 +93,8 @@ class DashboardScreen extends StatelessWidget {
         screen = SalesInvoiceScreen(harvestCase: harvestCase);
         break;
       case UserRole.plotSelection:
+        screen = const PlotSelectionListScreen();
+        break;
       case UserRole.eicherDriver:
       case UserRole.farmer:
       case UserRole.fpo:

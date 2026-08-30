@@ -96,6 +96,17 @@ class CaseService extends ChangeNotifier {
     return created;
   }
 
+  /// Accepts a marketplace handoff. The backend enforces both the
+  /// PLOT_SELECTION role and AWAITING_PLOT_SELECTION status.
+  Future<HarvestCase> acceptPlotSelection(HarvestCase harvestCase) async {
+    final res = await _api.post('/api/cases/${harvestCase.id}/plot-selection/accept')
+        as Map<String, dynamic>;
+    final updated = HarvestCase.fromApi(res);
+    _upsert(updated);
+    notifyListeners();
+    return updated;
+  }
+
   /// Editable only while the case is still at the very first status —
   /// the backend enforces this server-side (403 otherwise); this call
   /// isn't wired to a screen yet, but is here ready for the edit screen.

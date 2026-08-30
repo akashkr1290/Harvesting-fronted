@@ -47,6 +47,13 @@ class OrderCard extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(dateFmt.format(order.createdAt), style: const TextStyle(color: Colors.grey, fontSize: 12)),
+              if (order.expectedHarvestDate != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Expected Harvest Date: ${dateFmt.format(order.expectedHarvestDate!)}',
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+              ],
             ],
           ),
         ),

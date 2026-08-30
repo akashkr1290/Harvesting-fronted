@@ -53,6 +53,50 @@ class _PlotSelectionListScreenState extends State<PlotSelectionListScreen> {
     return role == UserRole.plotSelection && harvestCase.status == CaseStatus.submittedForPlanning;
   }
 
+  bool _isAwaitingAcceptance(HarvestCase harvestCase) {
+    final role = context.read<AuthService>().role;
+    return role == UserRole.plotSelection && harvestCase.status == CaseStatus.awaitingPlotSelection;
+  }
+
+  Future<void> _accept(HarvestCase harvestCase) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Accept Plot Selection?'),
+        content: const Text(
+          'Accept this marketplace case and send it to the Planning Team? This action cannot be undone from Plot Selection.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Accept'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await context.read<CaseService>().acceptPlotSelection(harvestCase);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Accepted. Case moved to Planning.')),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not accept the case. Check your connection and try again.')),
+      );
+    }
+  }
+
   void _openEdit(HarvestCase harvestCase) {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => PlotSelectionFormScreen(existingCase: harvestCase)),
@@ -246,14 +290,20 @@ class _PlotSelectionListScreenState extends State<PlotSelectionListScreen> {
                         return CaseCard(
                           harvestCase: c,
                           onTap: () => _showTimeline(c),
-                          trailingAction: _isEditable(c)
-                              ? IconButton(
-                                  tooltip: 'Edit',
-                                  visualDensity: VisualDensity.compact,
-                                  icon: const Icon(Icons.edit_outlined, size: 18, color: AppTheme.primary),
-                                  onPressed: () => _openEdit(c),
+                          trailingAction: _isAwaitingAcceptance(c)
+                              ? FilledButton.icon(
+                                  onPressed: () => _accept(c),
+                                  icon: const Icon(Icons.check, size: 18),
+                                  label: const Text('Accept'),
                                 )
-                              : null,
+                              : (_isEditable(c)
+                                  ? IconButton(
+                                      tooltip: 'Edit',
+                                      visualDensity: VisualDensity.compact,
+                                      icon: const Icon(Icons.edit_outlined, size: 18, color: AppTheme.primary),
+                                      onPressed: () => _openEdit(c),
+                                    )
+                                  : null),
                         );
                       },
                     ),

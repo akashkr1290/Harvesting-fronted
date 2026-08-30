@@ -3,6 +3,7 @@ import 'user_role.dart';
 /// The canonical stage sequence (see Working Approach doc, section 1).
 /// Order matters — index in this list determines allowed forward transitions.
 enum CaseStatus {
+  awaitingPlotSelection,
   submittedForPlanning,
   planned,
   rateUpdated,
@@ -20,6 +21,8 @@ extension CaseStatusX on CaseStatus {
   /// Matches the Java enum constant name exactly (e.g. RATE_UPDATED).
   String get apiValue {
     switch (this) {
+      case CaseStatus.awaitingPlotSelection:
+        return 'AWAITING_PLOT_SELECTION';
       case CaseStatus.submittedForPlanning:
         return 'SUBMITTED_FOR_PLANNING';
       case CaseStatus.planned:
@@ -47,6 +50,8 @@ extension CaseStatusX on CaseStatus {
 
   String get label {
     switch (this) {
+      case CaseStatus.awaitingPlotSelection:
+        return 'Awaiting Plot Selection';
       case CaseStatus.submittedForPlanning:
         return 'Submitted for Planning';
       case CaseStatus.planned:
@@ -75,6 +80,8 @@ extension CaseStatusX on CaseStatus {
   /// Which role owns the NEXT action once a case is in this status.
   UserRole get nextActorRole {
     switch (this) {
+      case CaseStatus.awaitingPlotSelection:
+        return UserRole.plotSelection;
       case CaseStatus.submittedForPlanning:
         return UserRole.planning;
       case CaseStatus.planned:
