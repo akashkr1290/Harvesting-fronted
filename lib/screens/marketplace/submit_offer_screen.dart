@@ -23,7 +23,10 @@ class _SubmitOfferScreenState extends State<SubmitOfferScreen> with SubmitStateM
   void initState() {
     super.initState();
     _quantityController = TextEditingController(text: widget.listing.quantity.toString());
-    _priceController = TextEditingController(text: widget.listing.expectedPricePerUnit.toString());
+    // Left blank rather than pre-filled with the listing's own asking price:
+    // a pre-filled value here reads as "the price", not as a starting point
+    // to negotiate down (or up) from — buyers were leaving it untouched.
+    _priceController = TextEditingController();
   }
 
   @override
@@ -91,7 +94,11 @@ class _SubmitOfferScreenState extends State<SubmitOfferScreen> with SubmitStateM
             const SizedBox(height: 12),
             TextFormField(
               controller: _priceController,
-              decoration: const InputDecoration(labelText: 'Your Price per Unit (₹) *'),
+              decoration: InputDecoration(
+                labelText: 'Your Price per Unit (₹) *',
+                helperText:
+                    'Listing price: ₹${widget.listing.expectedPricePerUnit.toStringAsFixed(2)} — enter what you want to offer',
+              ),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               validator: positiveNumericValidator,
             ),

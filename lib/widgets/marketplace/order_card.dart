@@ -45,6 +45,11 @@ class OrderCard extends StatelessWidget {
                 '${order.quantity.toStringAsFixed(0)} @ ₹${order.agreedPricePerUnit.toStringAsFixed(2)}  ·  Total ₹${order.totalAmount.toStringAsFixed(2)}',
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
+              if (order.expectedHarvestDate != null) ...[
+                const SizedBox(height: 4),
+                Text('Expected harvest: ${dateFmt.format(order.expectedHarvestDate!)}',
+                    style: const TextStyle(color: Colors.grey, fontSize: 12)),
+              ],
               const SizedBox(height: 6),
               Text(dateFmt.format(order.createdAt), style: const TextStyle(color: Colors.grey, fontSize: 12)),
               if (order.expectedHarvestDate != null) ...[

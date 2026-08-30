@@ -93,7 +93,11 @@ class DashboardScreen extends StatelessWidget {
         screen = SalesInvoiceScreen(harvestCase: harvestCase);
         break;
       case UserRole.plotSelection:
-        screen = const PlotSelectionListScreen();
+        if (harvestCase.status == CaseStatus.awaitingPlotSelection) {
+          _confirmAcceptPlotSelection(context, harvestCase);
+        } else {
+          screen = const PlotSelectionListScreen();
+        }
         break;
       case UserRole.eicherDriver:
       case UserRole.farmer:
@@ -106,6 +110,45 @@ class DashboardScreen extends StatelessWidget {
 
     if (screen != null) {
       Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen!));
+    }
+  }
+
+  /// Plot Selection's confirm-then-accept flow for a marketplace handoff —
+  /// the only pending-case action for this role that doesn't open a form
+  /// screen, since accepting has no fields of its own to fill in.
+  Future<void> _confirmAcceptPlotSelection(BuildContext context, HarvestCase harvestCase) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Accept this case?'),
+        content: Text(
+          'Accepting will move "${harvestCase.selection.farmerName}" · '
+          '${harvestCase.selection.village} into your Planning queue.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Accept')),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await context.read<CaseService>().acceptPlotSelection(harvestCase);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Case accepted — moved to Planning.')));
+      }
+    } on ApiException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not reach the server. Check your connection and try again.')),
+        );
+      }
     }
   }
 
