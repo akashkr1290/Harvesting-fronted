@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../models/market_order.dart';
-import '../../models/order_status.dart';
 import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
 import '../../services/order_service.dart';

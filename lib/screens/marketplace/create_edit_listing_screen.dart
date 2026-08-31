@@ -6,7 +6,6 @@ import '../../services/marketplace_service.dart';
 import '../produce_image_screen.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/form_helpers.dart';
-import 'package:provider/provider.dart';
 
 /// Doubles as both "Create Listing" and "Edit Listing" — pass
 /// [existingListing] to edit. The backend only allows edits while the

@@ -9,6 +9,7 @@ import 'dashboard_screen.dart';
 import 'forgot_password_screen.dart';
 import '../features/registration/register_user_screen.dart';
 import '../models/user_role.dart';
+import '../services/localization_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -112,9 +113,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   controller: _usernameController,
                   enabled: !_submitting,
                   textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(
-                    labelText: 'Username',
-                    prefixIcon: Icon(Icons.person_outline),
+                  decoration: InputDecoration(
+                    labelText: context.watch<LocalizationService>().t('username'),
+                    prefixIcon: const Icon(Icons.person_outline),
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -124,9 +125,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   obscureText: true,
                   textInputAction: TextInputAction.done,
                   onSubmitted: (_) => _login(),
-                  decoration: const InputDecoration(
-                    labelText: 'Password',
-                    prefixIcon: Icon(Icons.lock_outline),
+                  decoration: InputDecoration(
+                    labelText: context.watch<LocalizationService>().t('password'),
+                    prefixIcon: const Icon(Icons.lock_outline),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -147,7 +148,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       : () => Navigator.of(context).push(
                             MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
                           ),
-                  child: const Text('Forgot password?'),
+                  child: Text(context.watch<LocalizationService>().t('forgot')),
                 ),
                 TextButton(
                   onPressed: _submitting
@@ -155,7 +156,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       : () => Navigator.of(context).push(
                             MaterialPageRoute(builder: (_) => const RegisterUserScreen()),
                           ),
-                  child: const Text('Register User'),
+                  child: Text(context.watch<LocalizationService>().t('register')),
                 ),
                 const SizedBox(height: 8),
                 const Text(

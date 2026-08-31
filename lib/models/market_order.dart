@@ -24,6 +24,8 @@ class MarketOrder {
   final String? harvestCaseId;
   final CaseStatus? operationalStatus;
   final DateTime? deliveredAt;
+  final String? paymentMethod;
+  final String? paymentStatus;
 
   MarketOrder({
     required this.id,
@@ -43,6 +45,8 @@ class MarketOrder {
     this.harvestCaseId,
     this.operationalStatus,
     this.deliveredAt,
+    this.paymentMethod,
+    this.paymentStatus,
   });
 
   factory MarketOrder.fromJson(Map<String, dynamic> json) {

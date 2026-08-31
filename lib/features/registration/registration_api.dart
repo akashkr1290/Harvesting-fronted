@@ -11,5 +11,6 @@ class RegistrationApi {
   Future<Map<String,dynamic>> role(String token,String role) async => await _api.post('/api/auth/register/role',body:{'registrationToken':token,'role':role}) as Map<String,dynamic>;
   Future<Map<String,dynamic>> address(String token,Map<String,String> a) async => await _api.post('/api/auth/register/address',body:{'registrationToken':token,...a}) as Map<String,dynamic>;
   Future<Map<String,dynamic>> upload(String token,String type,List<int> bytes,String filename) async => await _api.uploadFile('/api/auth/register/documents/$type?registrationToken=${Uri.encodeQueryComponent(token)}',bytes:bytes,filename:filename) as Map<String,dynamic>;
+  Future<Map<String,dynamic>> bankDetails(String token,String holder,String account,String ifsc,String bank) async => await _api.post('/api/auth/register/bank-details',body:{'registrationToken':token,'accountHolderName':holder,'accountNumber':account,'ifscCode':ifsc,'bankName':bank}) as Map<String,dynamic>;
   Future<Map<String,dynamic>> submit(String token) async => await _api.post('/api/auth/register/submit',body:{'registrationToken':token}) as Map<String,dynamic>;
 }

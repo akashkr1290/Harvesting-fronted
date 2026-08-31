@@ -12,8 +12,11 @@ import 'services/order_service.dart';
 import 'services/demand_forecast_service.dart';
 import 'services/route_optimization_service.dart';
 import 'services/produce_image_service.dart';
+import 'services/delivery_service.dart';
+import 'services/market_payment_service.dart';
 import 'screens/login_screen.dart';
 import 'theme/app_theme.dart';
+import 'services/localization_service.dart';
 
 void main() {
   runApp(const HarvestFlowApp());
@@ -38,12 +41,15 @@ class _HarvestFlowAppState extends State<HarvestFlowApp> {
   // in a StatelessWidget's build().
   late final ApiClient _apiClient;
   late final AuthService _authService;
+  late final LocalizationService _localizationService;
 
   @override
   void initState() {
     super.initState();
     _apiClient = ApiClient();
     _authService = AuthService(_apiClient);
+    _localizationService = LocalizationService();
+    _localizationService.load();
 
     // Any request coming back 401 (expired/invalid token) forces a clean
     // logout + redirect, instead of the previous behavior of surfacing a
@@ -70,6 +76,7 @@ class _HarvestFlowAppState extends State<HarvestFlowApp> {
       providers: [
         Provider<ApiClient>.value(value: _apiClient),
         ChangeNotifierProvider<AuthService>.value(value: _authService),
+        ChangeNotifierProvider<LocalizationService>.value(value: _localizationService),
         ChangeNotifierProvider(create: (_) => CaseService(_apiClient)),
         ChangeNotifierProvider(create: (_) => UserService(_apiClient)),
         ChangeNotifierProvider(create: (_) => MasterDataService(_apiClient)),
@@ -80,13 +87,18 @@ class _HarvestFlowAppState extends State<HarvestFlowApp> {
         ChangeNotifierProvider(create: (_) => DemandForecastService(_apiClient)),
         ChangeNotifierProvider(create: (_) => RouteOptimizationService(_apiClient)),
         ChangeNotifierProvider(create: (_) => ProduceImageService(_apiClient)),
+         Provider(create: (_) => DeliveryService(_apiClient)),
+         Provider(create: (_) => MarketPaymentService(_apiClient)),
       ],
-      child: MaterialApp(
-        navigatorKey: navigatorKey,
-        title: 'HarvestFlow',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.theme,
-        home: const LoginScreen(),
+      child: Builder(
+        builder: (ctx) => MaterialApp(
+          navigatorKey: navigatorKey,
+          title: 'HarvestFlow',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.theme,
+          locale: ctx.watch<LocalizationService>().locale,
+          home: const LoginScreen(),
+        ),
       ),
     );
   }
