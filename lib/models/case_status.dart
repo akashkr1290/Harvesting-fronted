@@ -85,7 +85,7 @@ extension CaseStatusX on CaseStatus {
       case CaseStatus.submittedForPlanning:
         return UserRole.planning;
       case CaseStatus.planned:
-        return UserRole.purchaseAccount;
+        return UserRole.godown;
       case CaseStatus.rateUpdated:
         return UserRole.godown;
       case CaseStatus.packingMaterialIssued:

@@ -44,7 +44,10 @@ class _DemandForecastScreenState extends State<DemandForecastScreen>
     }
     final service = context.read<DemandForecastService>();
     await submitAction(
-      () => service.generate(_cropType!, _location!),
+      () async {
+        await service.generate(_cropType!, _location!);
+        await service.fetchOverview();
+      },
       successMessage: 'Forecast generated.',
       popOnSuccess: false,
     );

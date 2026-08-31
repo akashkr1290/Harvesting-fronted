@@ -73,7 +73,7 @@ class DashboardScreen extends StatelessWidget {
             : PurchaseInvoiceScreen(harvestCase: harvestCase);
         break;
       case UserRole.godown:
-        screen = harvestCase.status == CaseStatus.rateUpdated
+        screen = (harvestCase.status == CaseStatus.planned || harvestCase.status == CaseStatus.rateUpdated)
             ? GodownIssueScreen(harvestCase: harvestCase)
             : GodownReturnScreen(harvestCase: harvestCase);
         break;

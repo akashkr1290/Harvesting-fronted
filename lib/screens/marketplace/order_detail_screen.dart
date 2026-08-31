@@ -64,7 +64,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   String _caseStatusLabel(dynamic status) {
-    final words = status.name.split('_');
+    if (status == null) return '';
+    final String statusStr = status is Enum ? status.name : status.toString();
+    final words = statusStr.split('_');
     return words.map((w) => w.isEmpty ? w : '${w[0]}${w.substring(1).toLowerCase()}').join(' ');
   }
 
