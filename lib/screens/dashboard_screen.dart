@@ -33,6 +33,7 @@ import 'route_optimization_screen.dart';
 import 'login_screen.dart';
 import 'marketplace/marketplace_dashboard_screen.dart';
 import '../models/logistics_entry.dart';
+import '../widgets/language_selector_widget.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -172,6 +173,7 @@ class DashboardScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(role.label),
         actions: [
+          const LanguageSelectorWidget(isCompact: true),
           IconButton(
             tooltip: 'Notifications',
             icon: const Icon(Icons.notifications_outlined),
