@@ -39,6 +39,7 @@ import 'route_optimization_screen.dart';
 import 'login_screen.dart';
 import 'marketplace/marketplace_dashboard_screen.dart';
 import '../models/logistics_entry.dart';
+import '../widgets/language_selector_widget.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -186,6 +187,7 @@ class DashboardScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(role.label),
         actions: [
+          const LanguageSelectorWidget(isCompact: true),
           Semantics(identifier: 'hf.core.dashboard.notifications_button', child: IconButton(
             key: const Key('hf.core.dashboard.notifications_button'),
             tooltip: 'Notifications',
