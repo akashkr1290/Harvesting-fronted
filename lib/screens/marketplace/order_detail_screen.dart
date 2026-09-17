@@ -8,6 +8,13 @@ import '../../services/order_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/form_helpers.dart';
 import '../../widgets/marketplace/market_status_badge.dart';
+// PATCH 01 (Critical Gap #1): DeliveryPaymentScreen was only reachable from
+// DeliveryBoyScreen (itself unreachable), so the BUYER-side half of the flow
+// — payment method selection (FR-PAY-001/002), delivery OTP generation
+// (FR-DELIV-003) and receipt retrieval (FR-DELIV-004) — had no entry point at
+// all. Those three backend endpoints are gated to FARMER/FPO/CONSUMER/
+// BULK_BUYER, so the order detail screen is the correct entry point.
+import 'delivery_payment_screen.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final String orderId;
@@ -81,7 +88,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           const SizedBox(height: 12),
           Center(child: Text(_error!, textAlign: TextAlign.center)),
           const SizedBox(height: 16),
-          Center(child: OutlinedButton(onPressed: _load, child: const Text('Retry'))),
+          Center(child: Semantics(identifier: 'hf.mkt.order_detail.retry_button', child: OutlinedButton(key: const Key('hf.mkt.order_detail.retry_button'), onPressed: _load, child: const Text('Retry')))),
         ],
       );
     }
@@ -119,6 +126,27 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ),
         if (order.deliveredAt != null)
           LabeledValue(label: 'Delivered', value: dateFmt.format(order.deliveredAt!)),
+        // PATCH 01 (Critical Gap #1): buyer/seller entry point into the
+        // payment + delivery flow. Reloads the order on return so the payment
+        // status and delivered-at values shown here stay consistent with any
+        // action taken on the pushed screen (no stale state, no duplicate
+        // submission — the pushed screen owns its own busy-guard).
+        const SizedBox(height: 20),
+        Semantics(
+          identifier: 'hf.mkt.order_detail.payment_delivery_button',
+          child: ElevatedButton.icon(
+            key: const Key('hf.mkt.order_detail.payment_delivery_button'),
+            icon: const Icon(Icons.payments_outlined),
+            label: const Text('Payment & Delivery'),
+            onPressed: () => Navigator.of(context)
+                .push(MaterialPageRoute(
+                  builder: (_) => DeliveryPaymentScreen(orderId: widget.orderId),
+                ))
+                .then((_) {
+                  if (mounted) _load();
+                }),
+          ),
+        ),
         if (order.operationalStatus != null) ...[
           const SizedBox(height: 16),
           const SectionHeader('Internal Operations Status'),

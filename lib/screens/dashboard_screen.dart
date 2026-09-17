@@ -28,6 +28,12 @@ import 'admin/admin_verification_queue_screen.dart';
 import 'admin/sih_impact_screen.dart';
 import 'admin/payment_screen.dart';
 import 'notifications_screen.dart';
+// PATCH 01 (Critical Gap #1): DeliveryBoyScreen existed but was never imported
+// or navigated to from anywhere, making the whole delivery/payment flow
+// unreachable for PICKUP_PERSON. Backend endpoint GET /api/deliveries/assigned
+// is @PreAuthorize("hasRole('PICKUP_PERSON')"), so this dashboard is the
+// correct entry point for that role.
+import 'delivery_boy_screen.dart';
 import 'demand_forecast_screen.dart';
 import 'route_optimization_screen.dart';
 import 'login_screen.dart';
@@ -126,8 +132,16 @@ class DashboardScreen extends StatelessWidget {
           '${harvestCase.selection.village} into your Planning queue.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Accept')),
+          Semantics(identifier: 'hf.core.dashboard.accept_case_cancel_button', child: TextButton(
+            key: const Key('hf.core.dashboard.accept_case_cancel_button'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          )),
+          Semantics(identifier: 'hf.core.dashboard.accept_case_confirm_button', child: FilledButton(
+            key: const Key('hf.core.dashboard.accept_case_confirm_button'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Accept'),
+          )),
         ],
       ),
     );
@@ -172,15 +186,17 @@ class DashboardScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(role.label),
         actions: [
-          IconButton(
+          Semantics(identifier: 'hf.core.dashboard.notifications_button', child: IconButton(
+            key: const Key('hf.core.dashboard.notifications_button'),
             tooltip: 'Notifications',
             icon: const Icon(Icons.notifications_outlined),
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const NotificationsScreen()),
             ),
-          ),
+          )),
           if (role == UserRole.admin)
-            PopupMenuButton<String>(
+            Semantics(identifier: 'hf.core.dashboard.admin_tools_menu_button', child: PopupMenuButton<String>(
+              key: const Key('hf.core.dashboard.admin_tools_menu_button'),
               icon: const Icon(Icons.admin_panel_settings_outlined),
               tooltip: 'Admin Tools',
               onSelected: (value) {
@@ -209,32 +225,47 @@ class DashboardScreen extends StatelessWidget {
                 }
                 Navigator.of(context).push(MaterialPageRoute(builder: (_) => target));
               },
-              itemBuilder: (context) => const [
-                PopupMenuItem(value: 'overview', child: Text('Overview & Filters')),
-                PopupMenuItem(value: 'users', child: Text('User Management')),
-                PopupMenuItem(value: 'masters', child: Text('Master Data')),
-                PopupMenuItem(value: 'reports', child: Text('Reports')),
+              itemBuilder: (context) => [
+                PopupMenuItem(key: const Key('hf.core.dashboard.admin_menu_overview'), value: 'overview', child: Semantics(identifier: 'hf.core.dashboard.admin_menu_overview', child: Text('Overview & Filters'))),
+                PopupMenuItem(key: const Key('hf.core.dashboard.admin_menu_users'), value: 'users', child: Semantics(identifier: 'hf.core.dashboard.admin_menu_users', child: Text('User Management'))),
+                PopupMenuItem(key: const Key('hf.core.dashboard.admin_menu_masters'), value: 'masters', child: Semantics(identifier: 'hf.core.dashboard.admin_menu_masters', child: Text('Master Data'))),
+                PopupMenuItem(key: const Key('hf.core.dashboard.admin_menu_reports'), value: 'reports', child: Semantics(identifier: 'hf.core.dashboard.admin_menu_reports', child: Text('Reports'))),
                 PopupMenuDivider(),
-                PopupMenuItem(value: 'verification-queue', child: Text('Verification Queue')),
-                PopupMenuItem(value: 'sih-impact', child: Text('Analytics & SIH Impact')),
-                PopupMenuItem(value: 'payment', child: Text('Record Payment (mock)')),
+                PopupMenuItem(key: const Key('hf.core.dashboard.admin_menu_verification_queue'), value: 'verification-queue', child: Semantics(identifier: 'hf.core.dashboard.admin_menu_verification_queue', child: Text('Verification Queue'))),
+                PopupMenuItem(key: const Key('hf.core.dashboard.admin_menu_sih_impact'), value: 'sih-impact', child: Semantics(identifier: 'hf.core.dashboard.admin_menu_sih_impact', child: Text('Analytics & SIH Impact'))),
+                PopupMenuItem(key: const Key('hf.core.dashboard.admin_menu_payment'), value: 'payment', child: Semantics(identifier: 'hf.core.dashboard.admin_menu_payment', child: Text('Record Payment (mock)'))),
               ],
-            ),
+            )),
           if (role == UserRole.planning)
-            IconButton(
+            Semantics(identifier: 'hf.core.dashboard.demand_forecast_button', child: IconButton(
+              key: const Key('hf.core.dashboard.demand_forecast_button'),
               tooltip: 'Demand Forecast (AI)',
               icon: const Icon(Icons.auto_graph),
               onPressed: () => Navigator.of(context)
                   .push(MaterialPageRoute(builder: (_) => const DemandForecastScreen())),
-            ),
+            )),
           if (role == UserRole.pickupPerson || role == UserRole.transportPerson)
-            IconButton(
+            Semantics(identifier: 'hf.core.dashboard.route_optimization_button', child: IconButton(
+              key: const Key('hf.core.dashboard.route_optimization_button'),
               tooltip: 'Route Optimization',
               icon: const Icon(Icons.route_outlined),
               onPressed: () => Navigator.of(context)
                   .push(MaterialPageRoute(builder: (_) => const RouteOptimizationScreen())),
-            ),
-          IconButton(
+            )),
+          // PATCH 01 (Critical Gap #1): entry point for the marketplace delivery
+          // handover flow (FR-DELIV-002/003/004, FR-PAY-002 delivery side).
+          // Gated to pickupPerson only, matching DeliveryController's
+          // @PreAuthorize("hasRole('PICKUP_PERSON')") on /assigned.
+          if (role == UserRole.pickupPerson)
+            Semantics(identifier: 'hf.core.dashboard.deliveries_button', child: IconButton(
+              key: const Key('hf.core.dashboard.deliveries_button'),
+              tooltip: 'My Deliveries',
+              icon: const Icon(Icons.local_shipping_outlined),
+              onPressed: () => Navigator.of(context)
+                  .push(MaterialPageRoute(builder: (_) => const DeliveryBoyScreen())),
+            )),
+          Semantics(identifier: 'hf.core.dashboard.logout_button', child: IconButton(
+            key: const Key('hf.core.dashboard.logout_button'),
             tooltip: 'Log out',
             icon: const Icon(Icons.logout),
             onPressed: () {
@@ -244,11 +275,12 @@ class DashboardScreen extends StatelessWidget {
                 (route) => false,
               );
             },
-          ),
+          )),
         ],
       ),
       floatingActionButton: role == UserRole.plotSelection
-          ? FloatingActionButton.extended(
+          ? Semantics(identifier: 'hf.core.dashboard.new_selection_fab', child: FloatingActionButton.extended(
+              key: const Key('hf.core.dashboard.new_selection_fab'),
               onPressed: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const PlotSelectionFormScreen()),
@@ -256,7 +288,7 @@ class DashboardScreen extends StatelessWidget {
               },
               icon: const Icon(Icons.add),
               label: const Text('New Selection'),
-            )
+            ))
           : null,
       body: RefreshIndicator(
         onRefresh: () => _refresh(context, caseService),
@@ -294,12 +326,13 @@ class DashboardScreen extends StatelessWidget {
               children: [
                 Text('Pending on you (${pending.length})',
                     style: Theme.of(context).textTheme.titleMedium),
-                TextButton(
+                Semantics(identifier: 'hf.core.dashboard.browse_all_cases_button', child: TextButton(
+                  key: const Key('hf.core.dashboard.browse_all_cases_button'),
                   onPressed: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const PlotSelectionListScreen()),
                   ),
                   child: const Text('Browse All Cases'),
-                ),
+                )),
               ],
             ),
             const SizedBox(height: 8),
@@ -313,10 +346,11 @@ class DashboardScreen extends StatelessWidget {
               )
             else
               ...pending.map(
-                (c) => CaseCard(
+                (c) => Semantics(identifier: 'hf.core.dashboard.pending_case_card_${c.id}', child: CaseCard(
+                  key: ValueKey('hf.core.dashboard.pending_case_card_${c.id}'),
                   harvestCase: c,
                   onTap: () => _openCaseAction(context, role, c),
-                ),
+                )),
               ),
           ],
         ),
