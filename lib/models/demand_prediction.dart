@@ -70,6 +70,13 @@ class DemandPrediction {
   final DateTime generatedAt;
   final String? notes;
   final bool estimate;
+  /// e.g. "prophet", "holt-damped-trend" (AI service) or "statistical-local".
+  final String? forecastEngine;
+  final double? predictedLow;
+  final double? predictedHigh;
+  final double? predictedPricePerKg;
+  final String? priceTrend;
+  final String? dataSource;
 
   DemandPrediction({
     required this.id,
@@ -86,6 +93,12 @@ class DemandPrediction {
     required this.generatedAt,
     required this.notes,
     required this.estimate,
+    this.forecastEngine,
+    this.predictedLow,
+    this.predictedHigh,
+    this.predictedPricePerKg,
+    this.priceTrend,
+    this.dataSource,
   });
 
   factory DemandPrediction.fromJson(Map<String, dynamic> json) {
@@ -104,6 +117,12 @@ class DemandPrediction {
       generatedAt: DateTime.parse(json['generatedAt'] as String),
       notes: json['notes'] as String?,
       estimate: json['estimate'] as bool? ?? true,
+      forecastEngine: json['forecastEngine'] as String?,
+      predictedLow: (json['predictedLow'] as num?)?.toDouble(),
+      predictedHigh: (json['predictedHigh'] as num?)?.toDouble(),
+      predictedPricePerKg: (json['predictedPricePerKg'] as num?)?.toDouble(),
+      priceTrend: json['priceTrend'] as String?,
+      dataSource: json['dataSource'] as String?,
     );
   }
 }

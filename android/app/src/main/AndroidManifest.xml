@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Release builds need this to reach the backend; before, only debug/profile had it. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="harvesting_app_new"
+        android:label="HarvestFlow"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
         <activity

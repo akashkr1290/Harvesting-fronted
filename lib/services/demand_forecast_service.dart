@@ -45,10 +45,11 @@ class DemandForecastService extends ChangeNotifier {
     _lastError = null;
     notifyListeners();
     try {
+      // Seasonal models on the AI service can take up to ~45 s on a small server.
       final res = await _api.post('/api/demand/predict', body: {
         'cropType': cropType,
         'location': location,
-      }) as Map<String, dynamic>;
+      }, timeout: const Duration(seconds: 60)) as Map<String, dynamic>;
       _selected = DemandPrediction.fromJson(res);
     } on ApiException catch (e) {
       _lastError = e.message;

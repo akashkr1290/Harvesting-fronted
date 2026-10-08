@@ -19,6 +19,8 @@ class ProduceListingSummary {
   final String sellerName;
   final String? primaryImageUrl;
   final String verificationStatus;
+  /// Still for sale; the listing sells in parts until this reaches zero.
+  final double availableQuantity;
 
   ProduceListingSummary({
     required this.id,
@@ -33,7 +35,8 @@ class ProduceListingSummary {
     required this.sellerName,
     required this.primaryImageUrl,
     required this.verificationStatus,
-  });
+    double? availableQuantity,
+  }) : availableQuantity = availableQuantity ?? quantity;
 
   factory ProduceListingSummary.fromJson(Map<String, dynamic> json) {
     return ProduceListingSummary(
@@ -49,6 +52,7 @@ class ProduceListingSummary {
       sellerName: json['sellerName'] as String,
       primaryImageUrl: json['primaryImageUrl'] as String?,
       verificationStatus: json['verificationStatus'] as String? ?? 'NOT_SUBMITTED',
+      availableQuantity: (json['availableQuantity'] as num?)?.toDouble(),
     );
   }
 }
@@ -75,6 +79,7 @@ class ProduceListingDetail {
   final DateTime createdAt;
   final DateTime? publishedAt;
   final DateTime? closedAt;
+  final double availableQuantity;
 
   ProduceListingDetail({
     required this.id,
@@ -96,7 +101,8 @@ class ProduceListingDetail {
     required this.createdAt,
     required this.publishedAt,
     required this.closedAt,
-  });
+    double? availableQuantity,
+  }) : availableQuantity = availableQuantity ?? quantity;
 
   String? get primaryImageUrl {
     if (primaryImageIndex != null && primaryImageIndex! >= 0 && primaryImageIndex! < imageUrls.length) {
@@ -126,6 +132,7 @@ class ProduceListingDetail {
       createdAt: parseApiInstant(json['createdAt'] as String),
       publishedAt: parseApiInstantOrNull(json['publishedAt'] as String?),
       closedAt: parseApiInstantOrNull(json['closedAt'] as String?),
+      availableQuantity: (json['availableQuantity'] as num?)?.toDouble(),
     );
   }
 }

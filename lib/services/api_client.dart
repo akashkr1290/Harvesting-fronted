@@ -108,10 +108,10 @@ class ApiClient {
     throw _parseError(res);
   }
 
-  Future<dynamic> post(String path, {Object? body}) async {
+  Future<dynamic> post(String path, {Object? body, Duration? timeout}) async {
     final res = await http
         .post(_uri(path), headers: _headers, body: body == null ? null : jsonEncode(body))
-        .timeout(_timeout);
+        .timeout(timeout ?? _timeout);
     return _handle(res);
   }
 
@@ -151,7 +151,8 @@ class ApiClient {
     return _handle(res);
   }
 
-  static const _timeout = Duration(seconds: 15);
+  /// 30 s: rural mobile networks are slow and photo checks run on the server.
+  static const _timeout = Duration(seconds: 30);
 
   /// Full URL for a stored file path (e.g. an UploadResponse's "url":
   /// "/api/files/produce-photos/<uuid>.jpg") plus the header needed to

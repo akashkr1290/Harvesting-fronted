@@ -1,4 +1,4 @@
-enum OfferStatus { pending, accepted, rejected, withdrawn }
+enum OfferStatus { pending, accepted, rejected, withdrawn, expired }
 
 extension OfferStatusX on OfferStatus {
   String get apiValue => name.toUpperCase();
@@ -13,6 +13,8 @@ extension OfferStatusX on OfferStatus {
         return 'Rejected';
       case OfferStatus.withdrawn:
         return 'Withdrawn';
+      case OfferStatus.expired:
+        return 'Expired';
     }
   }
 }
@@ -20,6 +22,7 @@ extension OfferStatusX on OfferStatus {
 OfferStatus offerStatusFromApi(String value) {
   return OfferStatus.values.firstWhere(
     (s) => s.apiValue == value,
-    orElse: () => throw ArgumentError('Unknown offer status from API: $value'),
+    // Unknown values must not crash a screen when the backend is newer than the app.
+    orElse: () => OfferStatus.expired,
   );
 }

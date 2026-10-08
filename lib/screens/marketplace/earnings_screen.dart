@@ -85,11 +85,16 @@ class _EarningsScreenState extends State<EarningsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Total Earnings', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                const Text('Received (delivered orders)', style: TextStyle(color: Colors.grey, fontSize: 14)),
                 const SizedBox(height: 6),
                 Text(
-                  '₹${earnings.totalEarnings.toStringAsFixed(2)}',
+                  '₹${earnings.receivedAmount.toStringAsFixed(2)}',
                   style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppTheme.primaryDark),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Expected from accepted orders: ₹${earnings.expectedAmount.toStringAsFixed(2)}',
+                  style: const TextStyle(fontSize: 15, color: Colors.black87),
                 ),
                 const SizedBox(height: 12),
                 Row(

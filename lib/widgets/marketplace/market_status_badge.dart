@@ -41,6 +41,9 @@ class MarketStatusBadge extends StatelessWidget {
       case OfferStatus.withdrawn:
         color = const Color(0xFFC62828);
         break;
+      case OfferStatus.expired:
+        color = Colors.blueGrey;
+        break;
     }
     return MarketStatusBadge._(status.label, color);
   }

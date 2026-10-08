@@ -17,6 +17,9 @@ class Offer {
   final OfferStatus status;
   final DateTime createdAt;
   final DateTime? decidedAt;
+  final DateTime? expiresAt;
+  /// How much of the listing is still unsold (helps the farmer judge partial offers).
+  final double? listingAvailableQuantity;
 
   Offer({
     required this.id,
@@ -31,7 +34,11 @@ class Offer {
     required this.status,
     required this.createdAt,
     required this.decidedAt,
+    this.expiresAt,
+    this.listingAvailableQuantity,
   });
+
+  bool get isExpired => expiresAt != null && DateTime.now().isAfter(expiresAt!);
 
   double get totalAmount => quantity * pricePerUnit;
 
@@ -49,6 +56,8 @@ class Offer {
       status: offerStatusFromApi(json['status'] as String),
       createdAt: parseApiInstant(json['createdAt'] as String),
       decidedAt: parseApiInstantOrNull(json['decidedAt'] as String?),
+      expiresAt: parseApiInstantOrNull(json['expiresAt'] as String?),
+      listingAvailableQuantity: (json['listingAvailableQuantity'] as num?)?.toDouble(),
     );
   }
 }

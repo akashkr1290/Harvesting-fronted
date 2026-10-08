@@ -26,6 +26,8 @@ class MarketOrder {
   final DateTime? deliveredAt;
   final String? paymentMethod;
   final String? paymentStatus;
+  /// ASSISTED (company harvest workflow) or DIRECT (small order, delivery only).
+  final String fulfilmentMode;
 
   MarketOrder({
     required this.id,
@@ -47,7 +49,10 @@ class MarketOrder {
     this.deliveredAt,
     this.paymentMethod,
     this.paymentStatus,
+    this.fulfilmentMode = 'ASSISTED',
   });
+
+  bool get isPaid => paymentStatus == 'SUCCEEDED';
 
   factory MarketOrder.fromJson(Map<String, dynamic> json) {
     return MarketOrder(
@@ -72,6 +77,10 @@ class MarketOrder {
           ? null
           : caseStatusFromApi(json['operationalStatus'] as String),
       deliveredAt: json['deliveredAt'] == null ? null : parseApiInstant(json['deliveredAt'] as String),
+      // Sent by the API but never read before, so screens could not show payment state.
+      paymentMethod: json['paymentMethod'] as String?,
+      paymentStatus: json['paymentStatus'] as String?,
+      fulfilmentMode: json['fulfilmentMode'] as String? ?? 'ASSISTED',
     );
   }
 }
@@ -82,12 +91,18 @@ class EarningsSummary {
   final int completedOrders;
   final int confirmedOrders;
   final List<MarketOrder> recentOrders;
+  /// Money from delivered orders.
+  final double receivedAmount;
+  /// Accepted orders not delivered yet.
+  final double expectedAmount;
 
   EarningsSummary({
     required this.totalEarnings,
     required this.completedOrders,
     required this.confirmedOrders,
     required this.recentOrders,
+    this.receivedAmount = 0,
+    this.expectedAmount = 0,
   });
 
   factory EarningsSummary.fromJson(Map<String, dynamic> json) {
@@ -98,6 +113,9 @@ class EarningsSummary {
       recentOrders: (json['recentOrders'] as List)
           .map((e) => MarketOrder.fromJson(e as Map<String, dynamic>))
           .toList(),
+      receivedAmount: (json['receivedAmount'] as num?)?.toDouble() ?? 0,
+      expectedAmount: (json['expectedAmount'] as num?)?.toDouble() ??
+          (json['totalEarnings'] as num).toDouble(),
     );
   }
 }

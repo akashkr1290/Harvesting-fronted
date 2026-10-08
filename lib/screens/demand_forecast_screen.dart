@@ -204,7 +204,22 @@ class _ForecastCard extends StatelessWidget {
                 label: 'Confidence',
                 value: '${(prediction.confidenceScore! * 100).toStringAsFixed(0)}%',
               ),
+            if (prediction.predictedLow != null && prediction.predictedHigh != null)
+              LabeledValue(
+                label: 'Likely range (80%)',
+                value: '${prediction.predictedLow!.toStringAsFixed(0)} - ${prediction.predictedHigh!.toStringAsFixed(0)} KG',
+              ),
+            if (prediction.predictedPricePerKg != null)
+              LabeledValue(
+                label: 'Expected price',
+                value: '₹${prediction.predictedPricePerKg!.toStringAsFixed(1)}/kg'
+                    '${prediction.priceTrend != null ? ' (${prediction.priceTrend!.toLowerCase()})' : ''}',
+              ),
             LabeledValue(label: 'Based On', value: '${prediction.dataPointsUsed} month(s) of history'),
+            if (prediction.dataSource != null)
+              LabeledValue(label: 'Data', value: prediction.dataSource!.replaceAll(',', ', ')),
+            if (prediction.forecastEngine != null)
+              LabeledValue(label: 'Model', value: prediction.forecastEngine!),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
