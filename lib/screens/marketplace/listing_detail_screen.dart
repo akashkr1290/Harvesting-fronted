@@ -187,6 +187,8 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
           Text('${listing.sellerName} · ${listing.location}', style: const TextStyle(color: Colors.grey)),
           const SizedBox(height: 16),
           LabeledValue(label: 'Quantity', value: '${listing.quantity.toStringAsFixed(0)} ${listing.unit}'),
+          if (listing.availableQuantity < listing.quantity)
+            LabeledValue(label: 'Still available', value: '${listing.availableQuantity.toStringAsFixed(0)} ${listing.unit}'),
           LabeledValue(label: 'Quality', value: listing.quality?.isNotEmpty == true ? listing.quality! : '—'),
           LabeledValue(label: 'Harvest Date', value: dateFmt.format(listing.harvestDate)),
           LabeledValue(

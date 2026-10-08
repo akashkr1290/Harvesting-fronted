@@ -45,5 +45,13 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>HarvestFlow uses the camera to photograph your crop for buyers.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>HarvestFlow lets you choose a crop photo from your gallery.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>HarvestFlow listens when you speak a number or crop name instead of typing.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>HarvestFlow turns your spoken words into numbers and crop names.</string>
 </dict>
 </plist>

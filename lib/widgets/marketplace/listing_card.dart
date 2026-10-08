@@ -67,7 +67,7 @@ class ListingCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '${listing.quantity.toStringAsFixed(0)} ${listing.unit} · ₹${listing.expectedPricePerUnit.toStringAsFixed(2)}/${listing.unit}',
+                      '${listing.availableQuantity.toStringAsFixed(0)} ${listing.unit} available · ₹${listing.expectedPricePerUnit.toStringAsFixed(2)}/${listing.unit}',
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ],

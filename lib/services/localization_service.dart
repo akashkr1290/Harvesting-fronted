@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../l10n/simple_strings.dart';
 
 class AppLanguage {
   final Locale locale;
@@ -25,27 +26,58 @@ class LocalizationService extends ChangeNotifier {
   Locale _locale = const Locale('en');
   Locale get locale => _locale;
 
+  bool _loaded = false;
+  /// False until the saved language has been read (avoids flashing the language screen).
+  bool get loaded => _loaded;
+
   Future<void> load() async {
-    final p = await SharedPreferences.getInstance();
-    final code = p.getString(_key);
-    if (code != null && supportedLanguages.any((x) => x.locale.languageCode == code)) {
-      _locale = Locale(code);
+    try {
+      final p = await SharedPreferences.getInstance();
+      final code = p.getString(_key);
+      if (code != null && supportedLanguages.any((x) => x.locale.languageCode == code)) {
+        _locale = Locale(code);
+        _languageChosen = true;
+      }
+    } catch (_) {
+      // Storage unavailable: start in English and ask for the language.
     }
+    _loaded = true;
     notifyListeners();
   }
 
   Future<void> setLanguage(Locale locale) async {
     _locale = locale;
+    _languageChosen = true;
     notifyListeners();
     final p = await SharedPreferences.getInstance();
     await p.setString(_key, locale.languageCode);
   }
 
+  /// True until the user has picked a language once (first launch shows the language screen).
+  bool _languageChosen = false;
+  bool get languageChosen => _languageChosen;
+
   String t(String key) {
-    return _strings[_locale.languageCode]?[key] ??
+    final lang = _locale.languageCode;
+    return _strings[lang]?[key] ??
+        simpleStrings[lang]?[key] ??
         _strings['en']?[key] ??
+        simpleStrings['en']?[key] ??
         key;
   }
+
+  /// [t] with placeholders: tf('hello_name', {'name': 'Sunil'}).
+  String tf(String key, Map<String, Object?> values) {
+    var s = t(key);
+    values.forEach((k, v) => s = s.replaceAll('{$k}', '${v ?? ''}'));
+    return s;
+  }
+
+  /// BCP-47 tag for text-to-speech, e.g. hi-IN.
+  String get ttsLanguage => _locale.languageCode == 'en' ? 'en-IN' : '${_locale.languageCode}-IN';
+
+  /// Locale id for speech recognition, e.g. hi_IN.
+  String get speechLocaleId => _locale.languageCode == 'en' ? 'en_IN' : '${_locale.languageCode}_IN';
 }
 
 const Map<String, Map<String, String>> _strings = {

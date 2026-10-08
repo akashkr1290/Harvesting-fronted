@@ -11,6 +11,8 @@ import 'forgot_password_screen.dart';
 import '../features/registration/register_user_screen.dart';
 import '../models/user_role.dart';
 import '../services/localization_service.dart';
+import '../services/voice_service.dart';
+import '../widgets/simple/simple_ui.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -78,97 +80,185 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
+    if (!loc.loaded) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (!loc.languageChosen) {
+      return const _LanguageFirstScreen();
+    }
+
+    String speech() => '${loc.t('mobile_or_username')}. ${loc.t('pin_or_password')}. ${loc.t('login_btn')}.';
 
     return Scaffold(
+      backgroundColor: SimpleColors.ground,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(20),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
+              constraints: const BoxConstraints(maxWidth: 440),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: const LanguageSelectorWidget(),
-                  ),
+                  Row(children: [
+                    const LanguageSelectorWidget(),
+                    const Spacer(),
+                    SpeakButton(text: speech),
+                  ]),
                   const SizedBox(height: 16),
-                  const Icon(Icons.agriculture, size: 56, color: AppTheme.primary),
-                  const SizedBox(height: 12),
+                  const Icon(Icons.agriculture, size: 64, color: AppTheme.primary),
+                  const SizedBox(height: 8),
                   Text(
                     loc.t('app_title'),
                     textAlign: TextAlign.center,
-                    style: Theme.of(context)
-                        .textTheme
-                        .headlineSmall
-                        ?.copyWith(fontWeight: FontWeight.bold, color: AppTheme.primaryDark),
+                    style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: AppTheme.primaryDark),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    loc.t('app_tagline'),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.grey),
-                  ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 28),
                   TextField(
                     controller: _usernameController,
                     enabled: !_submitting,
+                    keyboardType: TextInputType.text,
                     textInputAction: TextInputAction.next,
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
                     decoration: InputDecoration(
-                      labelText: loc.t('username'),
-                      prefixIcon: const Icon(Icons.person_outline),
+                      labelText: loc.t('mobile_or_username'),
+                      helperText: loc.t('mobile_or_username_hint'),
+                      helperMaxLines: 2,
+                      prefixIcon: const Icon(Icons.phone_android_rounded, size: 28),
+                      suffixIcon: IconButton(
+                        tooltip: loc.t('speak_number'),
+                        iconSize: 28,
+                        icon: const Icon(Icons.mic_rounded, color: AppTheme.primary),
+                        onPressed: _submitting ? null : _speakMobile,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
                   TextField(
                     controller: _passwordController,
                     enabled: !_submitting,
                     obscureText: true,
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => _login(),
+                    style: const TextStyle(fontSize: 22, letterSpacing: 4),
                     decoration: InputDecoration(
-                      labelText: loc.t('password'),
-                      prefixIcon: const Icon(Icons.lock_outline),
+                      labelText: loc.t('pin_or_password'),
+                      prefixIcon: const Icon(Icons.lock_rounded, size: 28),
                     ),
                   ),
                   const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: _submitting ? null : _login,
-                    child: _submitting
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : Text(loc.t('login')),
+                  BigButton(
+                    label: loc.t('login_btn'),
+                    icon: Icons.login_rounded,
+                    busy: _submitting,
+                    onPressed: _login,
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 12),
+                  BigButton(
+                    label: loc.t('new_here_register'),
+                    icon: Icons.person_add_alt_1_rounded,
+                    outlined: true,
+                    onPressed: _submitting
+                        ? null
+                        : () => Navigator.of(context).push(
+                              MaterialPageRoute(builder: (_) => const RegisterUserScreen()),
+                            ),
+                  ),
+                  const SizedBox(height: 8),
                   TextButton(
                     onPressed: _submitting
                         ? null
                         : () => Navigator.of(context).push(
                               MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
                             ),
-                    child: Text(loc.t('forgot_password')),
-                  ),
-                  TextButton(
-                    onPressed: _submitting
-                        ? null
-                        : () => Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => const RegisterUserScreen()),
-                            ),
-                    child: Text(loc.t('register_user')),
+                    child: Text(loc.t('forgot_pin'), style: const TextStyle(fontSize: 17)),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    loc.t('role_notice'),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.grey, fontSize: 11),
-                  ),
+                  const HelpCallButton(),
                 ],
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _speakMobile() async {
+    final loc = context.read<LocalizationService>();
+    final heard = await context.read<VoiceService>().listen(localeId: loc.speechLocaleId);
+    final digits = (heard ?? '').replaceAll(RegExp(r'[^0-9०-९]'), '');
+    if (digits.isNotEmpty && mounted) {
+      const dev = '०१२३४५६७८९';
+      final ascii = digits.split('').map((c) => dev.contains(c) ? dev.indexOf(c).toString() : c).join();
+      setState(() => _usernameController.text = ascii);
+    }
+  }
+}
+
+/// First launch: pick the language by its own script, big buttons, before anything else.
+class _LanguageFirstScreen extends StatelessWidget {
+  const _LanguageFirstScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
+    return Scaffold(
+      backgroundColor: SimpleColors.ground,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: ListView(
+              padding: const EdgeInsets.all(20),
+              shrinkWrap: true,
+              children: [
+                const Icon(Icons.translate_rounded, size: 56, color: SimpleColors.green),
+                const SizedBox(height: 8),
+                const Text('अपनी भाषा चुनें · Choose your language',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: SimpleColors.ink)),
+                const SizedBox(height: 20),
+                GridView.count(
+                  crossAxisCount: 2,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 2.4,
+                  children: [
+                    for (final lang in supportedLanguages)
+                      Semantics(
+                        button: true,
+                        label: '${lang.nativeName} ${lang.name}',
+                        child: Material(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: () {
+                              loc.setLanguage(lang.locale);
+                              context.read<VoiceService>().speak(lang.nativeName, language: '${lang.locale.languageCode}-IN');
+                            },
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: SimpleColors.line, width: 2),
+                              ),
+                              alignment: Alignment.center,
+                              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                                Text(lang.nativeName,
+                                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: SimpleColors.ink)),
+                                Text(lang.name, style: const TextStyle(fontSize: 14, color: SimpleColors.quiet)),
+                              ]),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
             ),
           ),
         ),

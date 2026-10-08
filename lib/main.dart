@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'services/api_client.dart';
 import 'services/auth_service.dart';
@@ -17,6 +18,9 @@ import 'services/market_payment_service.dart';
 import 'screens/login_screen.dart';
 import 'theme/app_theme.dart';
 import 'services/localization_service.dart';
+import 'services/market_price_service.dart';
+import 'services/ui_mode_service.dart';
+import 'services/voice_service.dart';
 
 void main() {
   runApp(const HarvestFlowApp());
@@ -42,6 +46,8 @@ class _HarvestFlowAppState extends State<HarvestFlowApp> {
   late final ApiClient _apiClient;
   late final AuthService _authService;
   late final LocalizationService _localizationService;
+  late final UiModeService _uiModeService;
+  late final MarketPriceService _marketPriceService;
 
   @override
   void initState() {
@@ -50,6 +56,8 @@ class _HarvestFlowAppState extends State<HarvestFlowApp> {
     _authService = AuthService(_apiClient);
     _localizationService = LocalizationService();
     _localizationService.load();
+    _uiModeService = UiModeService()..load();
+    _marketPriceService = MarketPriceService(_apiClient);
 
     // Any request coming back 401 (expired/invalid token) forces a clean
     // logout + redirect, instead of the previous behavior of surfacing a
@@ -77,6 +85,9 @@ class _HarvestFlowAppState extends State<HarvestFlowApp> {
         Provider<ApiClient>.value(value: _apiClient),
         ChangeNotifierProvider<AuthService>.value(value: _authService),
         ChangeNotifierProvider<LocalizationService>.value(value: _localizationService),
+        ChangeNotifierProvider<UiModeService>.value(value: _uiModeService),
+        ChangeNotifierProvider(create: (_) => VoiceService()),
+        Provider<MarketPriceService>.value(value: _marketPriceService),
         ChangeNotifierProvider(create: (_) => CaseService(_apiClient)),
         ChangeNotifierProvider(create: (_) => UserService(_apiClient)),
         ChangeNotifierProvider(create: (_) => MasterDataService(_apiClient)),
@@ -97,6 +108,12 @@ class _HarvestFlowAppState extends State<HarvestFlowApp> {
           debugShowCheckedModeBanner: false,
           theme: AppTheme.theme,
           locale: ctx.watch<LocalizationService>().locale,
+          supportedLocales: supportedLanguages.map((l) => l.locale).toList(),
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
           home: const LoginScreen(),
         ),
       ),

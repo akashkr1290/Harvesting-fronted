@@ -43,12 +43,26 @@ class AppTheme {
           backgroundColor: primary,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+          minimumSize: const Size(64, 52),
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(minimumSize: const Size(64, 52)),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(minimumSize: const Size(48, 48), textStyle: const TextStyle(fontSize: 16)),
+      ),
+      // Larger defaults everywhere (Detailed mode too): 16 sp body text, 48 dp touch targets.
+      materialTapTargetSize: MaterialTapTargetSize.padded,
       textTheme: const TextTheme(
         titleLarge: TextStyle(fontWeight: FontWeight.bold),
-        titleMedium: TextStyle(fontWeight: FontWeight.w600),
+        titleMedium: TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
+        bodyLarge: TextStyle(fontSize: 17),
+        bodyMedium: TextStyle(fontSize: 16),
+        bodySmall: TextStyle(fontSize: 14),
+        labelLarge: TextStyle(fontSize: 16),
       ),
     );
   }

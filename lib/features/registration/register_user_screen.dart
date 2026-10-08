@@ -1,430 +1,407 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+
 import '../../services/api_client.dart';
-import '../../theme/app_theme.dart';
-import '../../widgets/language_selector_widget.dart';
 import '../../services/localization_service.dart';
+import '../../services/voice_service.dart';
+import '../../widgets/simple/simple_ui.dart';
 import 'registration_api.dart';
 
+/// Registration made for people who do not read or type much:
+/// 1 name + mobile + 6-digit PIN, 2 OTP, 3 "I am a…" picture cards,
+/// 4 village/district/state/PIN code, 5 photos (farmer/FPO only), 6 bank (farmer only).
+/// No email, no username, no Aadhaar needed; users log in with their mobile number.
 class RegisterUserScreen extends StatefulWidget {
   const RegisterUserScreen({super.key});
+
   @override
   State<RegisterUserScreen> createState() => _RegisterUserScreenState();
 }
 
-class _RegisterUserScreenState extends State<RegisterUserScreen> {
-  final _form = GlobalKey<FormState>();
-  final _username = TextEditingController(),
-      _password = TextEditingController(),
-      _name = TextEditingController(),
-      _email = TextEditingController(),
-      _mobile = TextEditingController(),
-      _mobileOtp = TextEditingController(),
-      _aadhaar = TextEditingController(),
-      _aadhaarOtp = TextEditingController(),
-      _address = TextEditingController(),
-      _city = TextEditingController(),
-      _district = TextEditingController(),
-      _state = TextEditingController(text: 'Bihar'),
-      _pin = TextEditingController();
+enum _Step { basics, otp, role, address, documents, bank }
 
-  final Map<String, XFile> _docs = {};
-  String? _token, _role;
-  int _step = 0;
-  bool _busy = false, _mobileVerified = false, _aadhaarVerified = false, _addressSaved = false;
+class _RegisterUserScreenState extends State<RegisterUserScreen> {
+  final _name = TextEditingController();
+  final _mobile = TextEditingController();
+  final _pin = TextEditingController();
+  final _pin2 = TextEditingController();
+  final _otp = TextEditingController();
+  final _village = TextEditingController();
+  final _district = TextEditingController();
+  final _pincode = TextEditingController();
+  final _holder = TextEditingController();
+  final _account = TextEditingController();
+  final _ifsc = TextEditingController();
+  final _bank = TextEditingController();
+  String _state = 'Maharashtra';
+  String? _role;
+  String? _token;
+  _Step _step = _Step.basics;
+  bool _busy = false;
+  final Map<String, Uint8List> _docs = {};
+  final Map<String, String> _docNames = {};
   final _picker = ImagePicker();
+
+  static const _states = [
+    'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Goa', 'Gujarat', 'Haryana',
+    'Himachal Pradesh', 'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur',
+    'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana',
+    'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal', 'Andaman and Nicobar Islands', 'Chandigarh',
+    'Dadra and Nagar Haveli and Daman and Diu', 'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry',
+  ];
 
   @override
   void dispose() {
-    for (final c in [
-      _username,
-      _password,
-      _name,
-      _email,
-      _mobile,
-      _mobileOtp,
-      _aadhaar,
-      _aadhaarOtp,
-      _address,
-      _city,
-      _district,
-      _state,
-      _pin
-    ]) {
+    for (final c in [_name, _mobile, _pin, _pin2, _otp, _village, _district, _pincode, _holder, _account, _ifsc, _bank]) {
       c.dispose();
     }
     super.dispose();
   }
 
-  RegistrationApi get api => RegistrationApi(context.read<ApiClient>());
+  RegistrationApi get _api => RegistrationApi(context.read<ApiClient>());
+  LocalizationService get _loc => context.read<LocalizationService>();
+
+  List<_Step> get _flow => [
+        _Step.basics,
+        _Step.otp,
+        _Step.role,
+        _Step.address,
+        if (_role == 'FARMER' || _role == 'FPO') _Step.documents,
+        if (_role == 'FARMER') _Step.bank,
+      ];
+
+  void _toast(String m) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m, style: const TextStyle(fontSize: 17))));
 
   Future<void> _run(Future<void> Function() fn) async {
     if (_busy) return;
     setState(() => _busy = true);
-    final loc = context.read<LocalizationService>();
     try {
       await fn();
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${loc.t('server_error')}: $e')));
+      if (mounted) _toast(e.details.isNotEmpty ? '${e.message} ${e.details.join(', ')}' : e.message);
+    } catch (_) {
+      if (mounted) _toast(_loc.t('no_internet'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  Future<void> _start() async {
-    if (!(_form.currentState?.validate() ?? false)) return;
+  // ---------------------------------------------------------------- step actions
+  Future<void> _submitBasics() async {
+    if (_name.text.trim().isEmpty) return _toast(_loc.t('field_required'));
+    if (!RegExp(r'^[6-9]\d{9}$').hasMatch(_mobile.text.trim())) return _toast(_loc.t('invalid_mobile'));
+    if (!RegExp(r'^\d{6}$').hasMatch(_pin.text)) return _toast(_loc.t('choose_pin'));
+    if (_pin.text != _pin2.text) return _toast(_loc.t('pin_mismatch'));
     await _run(() async {
-      final r = await api.start(
-          username: _username.text.trim(),
-          password: _password.text,
-          fullName: _name.text.trim(),
-          email: _email.text.trim());
-      _token = r['registrationToken'] as String;
-      setState(() => _step = 1);
+      _token ??= (await _api.start(username: '', password: _pin.text, fullName: _name.text.trim(), email: ''))['registrationToken']
+          as String;
+      await _api.sendMobile(_token!, _mobile.text.trim());
+      setState(() => _step = _Step.otp);
     });
   }
 
-  Future<void> _sendMobile() async {
+  Future<void> _verifyOtp() async {
+    if (_otp.text.trim().length != 6) return _toast(_loc.t('enter_otp'));
     await _run(() async {
-      await api.sendMobile(_token!, _mobile.text.trim());
+      await _api.verifyMobile(_token!, _otp.text.trim());
+      setState(() => _step = _Step.role);
     });
   }
 
-  Future<void> _verifyMobile() async {
+  Future<void> _chooseRole(String role) async {
     await _run(() async {
-      await api.verifyMobile(_token!, _mobileOtp.text.trim());
-      setState(() => _mobileVerified = true);
-    });
-  }
-
-  Future<void> _sendAadhaar() async {
-    await _run(() async {
-      await api.sendAadhaar(_token!, _aadhaar.text.replaceAll(' ', '').trim());
-    });
-  }
-
-  Future<void> _verifyAadhaar() async {
-    await _run(() async {
-      await api.verifyAadhaar(_token!, _aadhaarOtp.text.trim());
-      setState(() => _aadhaarVerified = true);
-    });
-  }
-
-  Future<void> _saveRole() async {
-    if (_role == null) return;
-    await _run(() async {
-      await api.role(_token!, _role!);
-      setState(() => _step = 4);
-    });
-  }
-
-  Future<void> _saveAddress() async {
-    await _run(() async {
-      await api.address(_token!, {
-        'addressLine': _address.text.trim(),
-        'villageOrCity': _city.text.trim(),
-        'district': _district.text.trim(),
-        'state': _state.text.trim(),
-        'pincode': _pin.text.trim()
-      });
+      await _api.role(_token!, role);
       setState(() {
-        _addressSaved = true;
-        _step = 5;
+        _role = role;
+        _step = _Step.address;
       });
     });
   }
 
-  Future<void> _pick(String type) async {
-    final x = await _picker.pickImage(
-        source: type == 'photo' || type == 'signature' ? ImageSource.gallery : ImageSource.camera,
-        maxWidth: 1800);
-    if (x != null) setState(() => _docs[type] = x);
+  Future<void> _submitAddress() async {
+    if (_village.text.trim().isEmpty || _district.text.trim().isEmpty) return _toast(_loc.t('field_required'));
+    if (!RegExp(r'^\d{6}$').hasMatch(_pincode.text.trim())) return _toast(_loc.t('pincode'));
+    await _run(() async {
+      await _api.address(_token!, {
+        'addressLine': '',
+        'villageOrCity': _village.text.trim(),
+        'district': _district.text.trim(),
+        'state': _state,
+        'pincode': _pincode.text.trim(),
+      });
+      if (_flow.contains(_Step.documents)) {
+        setState(() => _step = _Step.documents);
+      } else {
+        await _finish();
+      }
+    });
   }
 
-  Future<void> _uploadDocs() async {
-    final loc = context.read<LocalizationService>();
-    if (_docs.length != 3) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('upload_all_docs'))),
-      );
-      return;
-    }
+  Future<void> _pick(String type, ImageSource source) async {
+    try {
+      final x = await _picker.pickImage(source: source, maxWidth: 1800, imageQuality: 85);
+      if (x == null) return;
+      final bytes = await x.readAsBytes();
+      setState(() {
+        _docs[type] = bytes;
+        _docNames[type] = x.name.isEmpty ? '$type.jpg' : x.name;
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _submitDocuments() async {
+    final needed = _role == 'FARMER' ? ['photo', 'khet-receipt'] : ['photo'];
+    if (needed.any((t) => !_docs.containsKey(t))) return _toast(_loc.t('field_required'));
     await _run(() async {
       for (final e in _docs.entries) {
-        final bytes = await e.value.readAsBytes();
-        await api.upload(_token!, e.key, bytes, e.value.name);
+        await _api.upload(_token!, e.key, e.value, _docNames[e.key] ?? '${e.key}.jpg');
       }
-      setState(() => _step = 6);
+      if (_role == 'FARMER') {
+        setState(() => _step = _Step.bank);
+      } else {
+        await _finish();
+      }
     });
   }
 
-  Future<void> _submit() async {
-    final loc = context.read<LocalizationService>();
+  Future<void> _submitBank() async {
+    if ([_holder, _account, _ifsc, _bank].any((c) => c.text.trim().isEmpty)) return _toast(_loc.t('field_required'));
     await _run(() async {
-      await api.submit(_token!);
-      if (mounted) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => AlertDialog(
-            title: Text(loc.t('registration_complete')),
-            content: Text(
-                '${loc.t('username')}: ${_username.text}\n${loc.t('step_role')}: ${_roleLabel(_role!)}'),
-            actions: [
-              FilledButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).pop();
-                },
-                child: Text(loc.t('go_to_login')),
-              )
-            ],
-          ),
-        );
+      await _api.bankDetails(_token!, _holder.text.trim(), _account.text.replaceAll(' ', ''), _ifsc.text.trim().toUpperCase(),
+          _bank.text.trim());
+      await _finish();
+    });
+  }
+
+  Future<void> _finish() async {
+    await _api.submit(_token!);
+    if (!mounted) return;
+    final loc = _loc;
+    context.read<VoiceService>().speak(loc.t('account_ready'), language: loc.ttsLanguage);
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.check_circle_rounded, size: 72, color: SimpleColors.green),
+          const SizedBox(height: 12),
+          Text(loc.t('account_ready'), textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          Text(_mobile.text.trim(), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: 1)),
+          const SizedBox(height: 16),
+          BigButton(label: loc.t('login_btn'), onPressed: () => Navigator.of(ctx).pop()),
+        ]),
+      ),
+    );
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  void _back() {
+    final i = _flow.indexOf(_step);
+    // OTP cannot be "un-verified", so going back stops at the role step.
+    if (i <= 0 || _step == _Step.role) {
+      Navigator.of(context).maybePop();
+    } else {
+      setState(() => _step = _flow[i - 1]);
+    }
+  }
+
+  Future<void> _voiceInto(TextEditingController c, {bool digitsOnly = false}) async {
+    final heard = await context.read<VoiceService>().listen(localeId: _loc.speechLocaleId);
+    if (heard == null || !mounted) return;
+    setState(() {
+      if (digitsOnly) {
+        const dev = '०१२३४५६७८९';
+        final cleaned = heard.split('').map((ch) => dev.contains(ch) ? dev.indexOf(ch).toString() : ch).join();
+        c.text = cleaned.replaceAll(RegExp(r'[^0-9]'), '');
+      } else {
+        c.text = heard;
       }
     });
   }
 
-  String _roleLabel(String r) {
-    final loc = context.read<LocalizationService>();
-    return {
-          'FARMER': loc.t('role_farmer'),
-          'FPO': loc.t('role_fpo'),
-          'CONSUMER': loc.t('role_consumer'),
-          'BULK_BUYER': loc.t('role_bulk_buyer'),
-        }[r] ??
-        r;
-  }
-
-  Widget _field(TextEditingController c, String label,
-          {bool password = false, String? Function(String?)? validator}) {
-    final loc = context.watch<LocalizationService>();
-    return TextFormField(
-      controller: c,
-      obscureText: password,
-      decoration: InputDecoration(labelText: label),
-      validator: validator ?? (v) => v == null || v.trim().isEmpty ? loc.t('required') : null,
-    );
-  }
-
+  // ---------------------------------------------------------------- UI
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
-    final titles = [
-      loc.t('step_account'),
-      loc.t('step_mobile_otp'),
-      loc.t('step_aadhaar_otp'),
-      loc.t('step_role'),
-      loc.t('step_address'),
-      loc.t('step_documents'),
-      loc.t('step_review'),
-    ];
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(loc.t('register_title')),
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 8),
-            child: LanguageSelectorWidget(isCompact: true),
-          ),
+    final flow = _flow;
+    final index = flow.indexOf(_step);
+    final (String title, List<Widget> body, String action, VoidCallback? onAction) = switch (_step) {
+      _Step.basics => (loc.t('reg_title'), _basics(loc), loc.t('send_otp'), _submitBasics),
+      _Step.otp => (loc.t('enter_otp'), _otpStep(loc), loc.t('verify'), _verifyOtp),
+      _Step.role => (loc.t('i_am'), _roleStep(loc), '', null),
+      _Step.address => (loc.t('village'), _addressStep(loc), loc.t('next'), _submitAddress),
+      _Step.documents => (loc.t('photo_of_you'), _documentsStep(loc), loc.t('next'), _submitDocuments),
+      _Step.bank => (loc.t('bank_account'), _bankStep(loc), loc.t('create_account'), _submitBank),
+    };
+
+    return PopScope(
+      canPop: _step == _Step.basics && !_busy,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && !_busy) _back();
+      },
+      child: SimplePage(
+        header: Column(children: [
+          SimpleHeader(title: title, speakText: () => title),
+          Padding(padding: const EdgeInsets.only(top: 4), child: StepDots(current: index < 0 ? 0 : index, total: flow.length)),
+        ]),
+        children: body,
+        bottom: [
+          if (onAction != null) BigButton(label: action, onPressed: onAction, busy: _busy, icon: Icons.arrow_forward_rounded),
         ],
       ),
-      body: StepProgressIndicator(
-        step: _step,
-        titles: titles,
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: SingleChildScrollView(child: _body(loc)),
+    );
+  }
+
+  Widget _field(TextEditingController c, String label,
+      {TextInputType? type, bool obscure = false, int? maxLength, IconData? icon, bool voice = false, bool digits = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: TextField(
+        controller: c,
+        keyboardType: type,
+        obscureText: obscure,
+        maxLength: maxLength,
+        inputFormatters: digits ? [FilteringTextInputFormatter.digitsOnly] : null,
+        style: TextStyle(fontSize: 21, fontWeight: FontWeight.w600, letterSpacing: obscure ? 6 : 0),
+        decoration: InputDecoration(
+          labelText: label,
+          counterText: '',
+          prefixIcon: icon == null ? null : Icon(icon, size: 26),
+          suffixIcon: voice
+              ? IconButton(
+                  iconSize: 28,
+                  icon: const Icon(Icons.mic_rounded, color: SimpleColors.green),
+                  onPressed: () => _voiceInto(c, digitsOnly: digits),
+                )
+              : null,
         ),
       ),
     );
   }
 
-  Widget _body(LocalizationService loc) {
-    switch (_step) {
-      case 0:
-        return Form(
-          key: _form,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _field(_name, loc.t('full_name')),
-              const SizedBox(height: 12),
-              _field(_email, loc.t('email')),
-              const SizedBox(height: 12),
-              _field(_username, loc.t('username')),
-              const SizedBox(height: 12),
-              _field(_password, loc.t('password'), password: true, validator: (v) {
-                if (v == null || v.length < 8) return loc.t('min_8_chars');
-                if (!RegExp(r'(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9])').hasMatch(v)) {
-                  return loc.t('password_complexity');
-                }
-                return null;
-              }),
-              const SizedBox(height: 24),
-              _button(loc.t('continue_btn'), _start),
-            ],
+  List<Widget> _basics(LocalizationService loc) => [
+        _field(_name, loc.t('your_name'), icon: Icons.person_rounded, voice: true),
+        _field(_mobile, loc.t('mobile_or_username'),
+            type: TextInputType.phone, maxLength: 10, icon: Icons.phone_android_rounded, voice: true, digits: true),
+        _field(_pin, loc.t('choose_pin'), type: TextInputType.number, obscure: true, maxLength: 6, icon: Icons.lock_rounded, digits: true),
+        _field(_pin2, loc.t('pin_again'), type: TextInputType.number, obscure: true, maxLength: 6, icon: Icons.lock_rounded, digits: true),
+      ];
+
+  List<Widget> _otpStep(LocalizationService loc) => [
+        Text('${loc.t('enter_otp')}: ${_mobile.text}', style: const TextStyle(fontSize: 18)),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _otp,
+          keyboardType: TextInputType.number,
+          maxLength: 6,
+          textAlign: TextAlign.center,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w800, letterSpacing: 12),
+          decoration: const InputDecoration(counterText: ''),
+        ),
+        TextButton(
+          onPressed: _busy ? null : () => _run(() => _api.sendMobile(_token!, _mobile.text.trim())),
+          child: Text(loc.t('send_otp'), style: const TextStyle(fontSize: 17)),
+        ),
+      ];
+
+  List<Widget> _roleStep(LocalizationService loc) {
+    Widget card(String role, IconData icon, String label) => Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: BigActionTile(
+            height: 110,
+            icon: Icon(icon, size: 44, color: SimpleColors.green),
+            title: label,
+            onTap: _busy ? () {} : () => _chooseRole(role),
           ),
         );
-      case 1:
-        return Column(
-          children: [
-            _field(_mobile, loc.t('mobile_number'),
-                validator: (v) =>
-                    RegExp(r'^[6-9]\d{9}$').hasMatch(v ?? '') ? null : loc.t('enter_valid_mobile')),
-            const SizedBox(height: 12),
-            _button(loc.t('send_otp'), _sendMobile),
-            const SizedBox(height: 12),
-            if (_mobileVerified) ...[
-              Text('${loc.t('step_mobile_otp')} ${loc.t('otp_verified')}'),
-              const SizedBox(height: 12),
-              _button(loc.t('continue_btn'), () => setState(() => _step = 2)),
-            ] else ...[
-              _field(_mobileOtp, loc.t('enter_6_digit_otp')),
-              const SizedBox(height: 12),
-              _button(loc.t('verify_otp'), _verifyMobile),
-            ],
-          ],
-        );
-      case 2:
-        return Column(
-          children: [
-            _field(_aadhaar, loc.t('aadhaar_number'),
-                validator: (v) => RegExp(r'^\d{12}$').hasMatch((v ?? '').replaceAll(' ', ''))
-                    ? null
-                    : loc.t('enter_valid_aadhaar')),
-            const SizedBox(height: 12),
-            _button(loc.t('send_aadhaar_otp'), _sendAadhaar),
-            const SizedBox(height: 12),
-            if (_aadhaarVerified) ...[
-              Text('${loc.t('step_aadhaar_otp')} ${loc.t('otp_verified')}'),
-              const SizedBox(height: 12),
-              _button(loc.t('continue_btn'), () => setState(() => _step = 3)),
-            ] else ...[
-              _field(_aadhaarOtp, loc.t('enter_6_digit_otp')),
-              const SizedBox(height: 12),
-              _button(loc.t('verify_otp'), _verifyAadhaar),
-            ],
-          ],
-        );
-      case 3:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(loc.t('select_role'),
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            for (final r in ['FARMER', 'FPO', 'CONSUMER', 'BULK_BUYER'])
-              RadioListTile<String>(
-                value: r,
-                groupValue: _role,
-                onChanged: (v) => setState(() => _role = v),
-                title: Text(_roleLabel(r)),
-              ),
-            const SizedBox(height: 12),
-            _button(loc.t('continue_btn'), _saveRole),
-          ],
-        );
-      case 4:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _field(_address, loc.t('address_line')),
-            _field(_city, loc.t('village_city')),
-            _field(_district, loc.t('district')),
-            _field(_state, loc.t('state')),
-            _field(_pin, loc.t('pincode'),
-                validator: (v) =>
-                    RegExp(r'^\d{6}$').hasMatch(v ?? '') ? null : loc.t('enter_valid_pincode')),
-            const SizedBox(height: 20),
-            _button(loc.t('continue_btn'), _saveAddress),
-          ],
-        );
-      case 5:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _doc(loc, 'khet-receipt', loc.t('upload_khet_receipt')),
-            _doc(loc, 'signature', loc.t('upload_signature')),
-            _doc(loc, 'photo', loc.t('upload_photo')),
-            const SizedBox(height: 20),
-            _button(loc.t('upload_and_continue'), _uploadDocs),
-          ],
-        );
-      default:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _summary(loc.t('username'), _username.text),
-            _summary(loc.t('mobile_number'), _mask(_mobile.text)),
-            _summary(loc.t('aadhaar_number'), _maskAadhaar(_aadhaar.text)),
-            _summary(loc.t('step_role'), _roleLabel(_role!)),
-            _summary(loc.t('step_address'),
-                '${_address.text}, ${_city.text}, ${_district.text}, ${_state.text} - ${_pin.text}'),
-            _summary(loc.t('step_documents'), '${_docs.length}/3 ${loc.t('uploaded')}'),
-            const SizedBox(height: 24),
-            _button(loc.t('submit_registration'), _submit),
-          ],
-        );
-    }
+    return [
+      card('FARMER', Icons.agriculture_rounded, loc.t('role_farmer_s')),
+      card('FPO', Icons.groups_rounded, loc.t('role_fpo_s')),
+      card('CONSUMER', Icons.home_rounded, loc.t('role_consumer_s')),
+      card('BULK_BUYER', Icons.store_rounded, loc.t('role_bulk_s')),
+    ];
   }
 
-  Widget _doc(LocalizationService loc, String type, String label) => Card(
-        child: ListTile(
-          title: Text(label),
-          subtitle: Text(_docs[type]?.name ?? loc.t('not_uploaded')),
-          trailing: IconButton(
-            icon: const Icon(Icons.upload_file),
-            onPressed: () => _pick(type),
+  List<Widget> _addressStep(LocalizationService loc) => [
+        _field(_village, loc.t('village'), icon: Icons.place_rounded, voice: true),
+        _field(_district, loc.t('district'), icon: Icons.map_rounded, voice: true),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: DropdownButtonFormField<String>(
+            initialValue: _state,
+            isExpanded: true,
+            style: const TextStyle(fontSize: 20, color: SimpleColors.ink),
+            decoration: InputDecoration(labelText: loc.t('state')),
+            items: [for (final s in _states) DropdownMenuItem(value: s, child: Text(s))],
+            onChanged: (v) => setState(() => _state = v ?? _state),
           ),
         ),
+        _field(_pincode, loc.t('pincode'), type: TextInputType.number, maxLength: 6, icon: Icons.pin_drop_rounded, voice: true, digits: true),
+      ];
+
+  List<Widget> _documentsStep(LocalizationService loc) {
+    Widget doc(String type, String label, IconData icon) {
+      final has = _docs.containsKey(type);
+      return Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: has ? SimpleColors.green : SimpleColors.line, width: has ? 3 : 2),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            Icon(has ? Icons.check_circle_rounded : icon, size: 36, color: has ? SimpleColors.green : SimpleColors.quiet),
+            const SizedBox(width: 10),
+            Expanded(child: Text(label, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800))),
+          ]),
+          if (has) ...[
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.memory(_docs[type]!, height: 140, fit: BoxFit.cover),
+            ),
+          ],
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(
+              child: BigButton(
+                label: loc.t('take_photo'),
+                icon: Icons.photo_camera_rounded,
+                outlined: has,
+                onPressed: () => _pick(type, ImageSource.camera),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filledTonal(
+              iconSize: 30,
+              tooltip: loc.t('from_gallery'),
+              onPressed: () => _pick(type, ImageSource.gallery),
+              icon: const Icon(Icons.photo_library_rounded),
+            ),
+          ]),
+        ]),
       );
+    }
 
-  Widget _summary(String k, String v) =>
-      ListTile(title: Text(k, style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text(v));
-
-  String _mask(String s) =>
-      s.length < 4 ? 'XXXXXXXXXX' : 'XXXXXX${s.substring(s.length - 4)}';
-  String _maskAadhaar(String s) {
-    final x = s.replaceAll(' ', '');
-    return x.length < 4 ? 'XXXX-XXXX-XXXX' : 'XXXX-XXXX-${x.substring(x.length - 4)}';
+    return [
+      doc('photo', loc.t('photo_of_you'), Icons.face_rounded),
+      if (_role == 'FARMER') doc('khet-receipt', loc.t('land_record'), Icons.description_rounded),
+    ];
   }
 
-  Widget _button(String text, VoidCallback fn) => ElevatedButton(
-        onPressed: _busy ? null : fn,
-        child: _busy
-            ? const SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : Text(text),
-      );
-}
-
-class StepProgressIndicator extends StatelessWidget {
-  final int step;
-  final List<String> titles;
-  final Widget child;
-  const StepProgressIndicator(
-      {super.key, required this.step, required this.titles, required this.child});
-  @override
-  Widget build(BuildContext context) => Column(
-        children: [
-          LinearProgressIndicator(value: (step + 1) / titles.length, minHeight: 4),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Text(
-              '${step + 1}. ${titles[step]}',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: AppTheme.primary,
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-          ),
-          Expanded(child: child),
-        ],
-      );
+  List<Widget> _bankStep(LocalizationService loc) => [
+        _field(_holder, loc.t('bank_holder'), icon: Icons.person_rounded, voice: true),
+        _field(_account, loc.t('bank_account'), type: TextInputType.number, maxLength: 18, icon: Icons.account_balance_rounded, digits: true),
+        _field(_ifsc, loc.t('ifsc'), icon: Icons.qr_code_rounded),
+        _field(_bank, loc.t('bank_name'), icon: Icons.account_balance_rounded, voice: true),
+      ];
 }

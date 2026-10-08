@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/offer.dart';
+import '../../models/offer_status.dart';
 import 'market_status_badge.dart';
 
 /// Used both on the buyer's "My Offers" list and the farmer's "Offers
@@ -58,6 +59,9 @@ class OfferCard extends StatelessWidget {
               ],
               const SizedBox(height: 6),
               Text(dateFmt.format(offer.createdAt), style: const TextStyle(color: Colors.grey, fontSize: 12)),
+              if (offer.status == OfferStatus.pending && offer.expiresAt != null)
+                Text('Expires ${dateFmt.format(offer.expiresAt!.toLocal())}',
+                    style: const TextStyle(color: Colors.orange, fontSize: 12)),
               if (trailingAction != null) ...[
                 const SizedBox(height: 10),
                 trailingAction!,

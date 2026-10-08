@@ -22,7 +22,8 @@ class _SubmitOfferScreenState extends State<SubmitOfferScreen> with SubmitStateM
   @override
   void initState() {
     super.initState();
-    _quantityController = TextEditingController(text: widget.listing.quantity.toString());
+    // Listings sell in parts: start from what is still available, not the original lot.
+    _quantityController = TextEditingController(text: widget.listing.availableQuantity.toStringAsFixed(0));
     // Left blank rather than pre-filled with the listing's own asking price:
     // a pre-filled value here reads as "the price", not as a starting point
     // to negotiate down (or up) from — buyers were leaving it untouched.
@@ -45,8 +46,8 @@ class _SubmitOfferScreenState extends State<SubmitOfferScreen> with SubmitStateM
     final base = positiveNumericValidator(value);
     if (base != null) return base;
     final parsed = double.parse(value!.trim());
-    if (parsed > widget.listing.quantity) {
-      return 'Only ${widget.listing.quantity.toStringAsFixed(0)} ${widget.listing.unit} available';
+    if (parsed > widget.listing.availableQuantity) {
+      return 'Only ${widget.listing.availableQuantity.toStringAsFixed(0)} ${widget.listing.unit} available';
     }
     return null;
   }
@@ -81,7 +82,7 @@ class _SubmitOfferScreenState extends State<SubmitOfferScreen> with SubmitStateM
             const SizedBox(height: 4),
             Text(
               'Listed at ₹${widget.listing.expectedPricePerUnit.toStringAsFixed(2)} / ${widget.listing.unit} · '
-              '${widget.listing.quantity.toStringAsFixed(0)} ${widget.listing.unit} available',
+              '${widget.listing.availableQuantity.toStringAsFixed(0)} ${widget.listing.unit} available',
               style: const TextStyle(color: Colors.grey, fontSize: 13),
             ),
             const SizedBox(height: 24),

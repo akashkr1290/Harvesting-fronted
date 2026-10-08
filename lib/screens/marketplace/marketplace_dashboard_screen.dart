@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../widgets/simple/simple_ui.dart';
+import '../simple/buyer_home_simple.dart';
+import '../simple/farmer_home_simple.dart';
 import 'package:provider/provider.dart';
 import '../../models/user_role.dart';
 import '../../services/auth_service.dart';
@@ -23,6 +26,11 @@ class MarketplaceDashboardScreen extends StatelessWidget {
     final auth = context.watch<AuthService>();
     final role = auth.role ?? UserRole.consumer;
     final isSeller = role.isMarketplaceSeller;
+
+    // Simple mode (default for farmers, FPOs and consumers): picture-first home screens.
+    if (useSimple(context)) {
+      return isSeller ? const FarmerHomeSimple() : const BuyerHomeSimple();
+    }
 
     final tiles = isSeller
         ? [
@@ -78,6 +86,8 @@ class MarketplaceDashboardScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(role.label),
         actions: [
+          const Padding(padding: EdgeInsets.symmetric(vertical: 6), child: ModeToggle(onDark: true)),
+          const SizedBox(width: 4),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Log out',
